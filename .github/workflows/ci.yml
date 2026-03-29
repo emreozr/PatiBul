@@ -1,0 +1,37 @@
+name: PatiBul CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend-ci:
+    name: Backend – Bağımlılık & API Testleri
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu çek
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bağımlılıkları yükle
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Flake8 ile kod kalitesi kontrol et
+        working-directory: backend
+        run: |
+          pip install flake8
+          flake8 . --max-line-length=120 --exclude=__pycache__
+
+      - name: Testleri çalıştır
+        working-directory: backend
+        run: |
+          python -m pytest tests/ -v
