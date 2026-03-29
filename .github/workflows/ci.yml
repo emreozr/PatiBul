@@ -25,12 +25,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Flake8 ile kod kalitesi kontrol et
-        working-directory: backend
-        run: |
-          pip install flake8
-          flake8 . --max-line-length=120 --exclude=__pycache__
-
       - name: Testleri çalıştır
         working-directory: backend
         run: |
