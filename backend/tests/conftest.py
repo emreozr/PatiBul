@@ -1,13 +1,20 @@
 import pytest
-from app import app, db
+from app import create_app
+from models import db as _db
+
 
 @pytest.fixture
-def client():
+def app():
+    app = create_app()
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     app.config['JWT_SECRET_KEY'] = 'test-secret'
+    return app
 
+
+@pytest.fixture
+def client(app):
     with app.app_context():
-        db.create_all()
+        _db.create_all()
         yield app.test_client()
-        db.drop_all()
+        _db.drop_all()
