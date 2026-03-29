@@ -6,7 +6,7 @@ def test_register_basarili(client):
         data=json.dumps({
             'email': 'test@patibul.com',
             'password': 'Sifre1234',
-            'full_name': 'Test Kullanici',
+            'name': 'Test Kullanici',
             'role': 'user'
         }),
         content_type='application/json'
@@ -19,7 +19,7 @@ def test_login_basarili(client):
         data=json.dumps({
             'email': 'giris@patibul.com',
             'password': 'Sifre1234',
-            'full_name': 'Giris Kullanici',
+            'name': 'Giris Kullanici',
             'role': 'user'
         }),
         content_type='application/json'
@@ -41,7 +41,7 @@ def test_login_yanlis_sifre(client):
         data=json.dumps({
             'email': 'yanlis@patibul.com',
             'password': 'DogruSifre',
-            'full_name': 'Test',
+            'name': 'Test',
             'role': 'user'
         }),
         content_type='application/json'
