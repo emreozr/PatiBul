@@ -1,14 +1,12 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
-from flask_bcrypt import Bcrypt
 from models import db, User
+from app import bcrypt  # Direkt app'ten import et, dosya başında tekrar Bcrypt() oluşturma
 
 auth_bp = Blueprint("auth", __name__)
-bcrypt = Bcrypt()
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    from app import bcrypt
     data = request.get_json()
 
     for field in ["name", "email", "password"]:
@@ -40,7 +38,6 @@ def register():
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    from app import bcrypt
     data = request.get_json()
 
     if not data.get("email") or not data.get("password"):
