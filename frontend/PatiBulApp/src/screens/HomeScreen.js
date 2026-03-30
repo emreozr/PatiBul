@@ -2,18 +2,21 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
+import { useAuth } from '../context/AuthContext';
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = () => {
+  const { logout } = useAuth();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>PatiBul Anasayfa</Text>
       <Text style={styles.subtitle}>Hoşgeldiniz!</Text>
 
       <View style={styles.buttonContainer}>
-        <CustomButton 
-          title="Çıkış Yap" 
+        <CustomButton
+          title="Çıkış Yap"
           type="secondary"
-          onPress={() => navigation.replace('Login')} 
+          onPress={logout}
         />
       </View>
     </View>
