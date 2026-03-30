@@ -1,21 +1,52 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import InputField from '../components/InputField';
 import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
+import { useAuth } from '../context/AuthContext';
+
+const API_URL = 'http://192.168.1.125:5000';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
       return;
     }
-    // TODO: Login işlemi için API'ye bağlanacak
 
-    navigation.replace('Home');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        Alert.alert('Hata', data.error || 'Giriş başarısız.');
+        return;
+      }
+
+      // Token ve kullanıcı bilgisini AuthContext'e kaydet
+      // navigation.replace('Home') KALDIRILDI — token set edilince app.js otomatik yönlendirir
+      login(data.access_token, data.user);
+
+    } catch (error) {
+      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor. Lütfen tekrar deneyin.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,7 +71,11 @@ const LoginScreen = ({ navigation }) => {
           secureTextEntry={true}
         />
 
-        <CustomButton title="Giriş Yap" onPress={handleLogin} style={styles.loginButton} />
+        {loading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={styles.loginButton} />
+        ) : (
+          <CustomButton title="Giriş Yap" onPress={handleLogin} style={styles.loginButton} />
+        )}
 
         <CustomButton
           title="Hesabın yok mu? Kayıt Ol"
