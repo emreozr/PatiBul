@@ -4,8 +4,9 @@ import InputField from '../components/InputField';
 import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
 import { useAuth } from '../context/AuthContext';
+import config from '../config';
 
-const API_URL = 'http://192.168.1.125:5000';
+const API_URL = config.API_URL;
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');

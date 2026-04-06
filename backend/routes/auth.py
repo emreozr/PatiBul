@@ -1,9 +1,10 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
 from models import db, User
-from app import bcrypt  # Direkt app'ten import et, dosya başında tekrar Bcrypt() oluşturma
+from app import bcrypt
 
 auth_bp = Blueprint("auth", __name__)
+
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
@@ -27,7 +28,7 @@ def register():
         email=data["email"],
         password=hashed_pw,
         role=role,
-        phone=data.get("phone")
+        phone=data.get("phone"),
     )
 
     db.session.add(user)
@@ -48,10 +49,14 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password, data["password"]):
         return jsonify({"error": "E-posta veya şifre hatalı"}), 401
 
-    token = create_access_token(identity={"id": user.id, "role": user.role})
+    # identity string olmalı, rol additional_claims ile gönderiliyor
+    token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"role": user.role}
+    )
 
     return jsonify({
         "message": "Giriş başarılı",
         "access_token": token,
-        "user": user.to_dict()
+        "user": user.to_dict(),
     }), 200

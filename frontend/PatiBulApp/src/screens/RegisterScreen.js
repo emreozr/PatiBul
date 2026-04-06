@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, Alert, ScrollView,
+  ActivityIndicator, TouchableOpacity
+} from 'react-native';
 import InputField from '../components/InputField';
 import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
+import config from '../config';
 
-const API_URL = 'http://192.168.1.125:5000';
+const API_URL = config.API_URL;
 
 const RegisterScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
@@ -23,14 +28,12 @@ const RegisterScreen = ({ navigation }) => {
     try {
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: username,
           email: email,
           password: password,
-          role: 'user',
+          role: role,
         }),
       });
 
@@ -61,9 +64,40 @@ const RegisterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.formContainer}>
+
+          {/* Rol Seçimi */}
+          <Text style={styles.roleLabel}>Hesap Türü</Text>
+          <View style={styles.roleContainer}>
+            <TouchableOpacity
+              style={[styles.roleButton, role === 'user' && styles.roleButtonActive]}
+              onPress={() => setRole('user')}
+            >
+              <Text style={styles.roleIcon}>🐾</Text>
+              <Text style={[styles.roleButtonText, role === 'user' && styles.roleButtonTextActive]}>
+                Hayvan Sahibi
+              </Text>
+              <Text style={[styles.roleButtonSub, role === 'user' && styles.roleButtonSubActive]}>
+                Kayıp ilanı ver, bildirim yap
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.roleButton, role === 'vet' && styles.roleButtonActive]}
+              onPress={() => setRole('vet')}
+            >
+              <Text style={styles.roleIcon}>🏥</Text>
+              <Text style={[styles.roleButtonText, role === 'vet' && styles.roleButtonTextActive]}>
+                Veteriner Kliniği
+              </Text>
+              <Text style={[styles.roleButtonSub, role === 'vet' && styles.roleButtonSubActive]}>
+                Bildirimleri yönet, yanıt ver
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <InputField
-            label="Kullanıcı Adı"
-            placeholder="Kullanıcı adınızı girin"
+            label="Ad Soyad"
+            placeholder="Adınızı ve soyadınızı girin"
             value={username}
             onChangeText={setUsername}
           />
@@ -111,7 +145,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
     marginTop: 40,
   },
   title: {
@@ -126,6 +160,52 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
+  },
+  roleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 10,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  roleButton: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  roleButtonActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '11',
+  },
+  roleIcon: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  roleButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  roleButtonTextActive: {
+    color: Colors.primary,
+  },
+  roleButtonSub: {
+    fontSize: 10,
+    color: '#aaa',
+    textAlign: 'center',
+  },
+  roleButtonSubActive: {
+    color: Colors.primary,
   },
   registerButton: {
     marginTop: 20,
