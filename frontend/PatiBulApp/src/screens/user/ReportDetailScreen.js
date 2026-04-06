@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import config from '../../config';
@@ -62,6 +63,24 @@ const ReportDetailScreen = ({ route }) => {
           <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
         </View>
       </View>
+
+      {/* Fotoğraflar */}
+      {report.images && report.images.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.imagesScroll}
+        >
+          {report.images.map(img => (
+            <Image
+              key={img.id}
+              source={{ uri: `${API_URL}${img.image_url}` }}
+              style={styles.reportImage}
+              resizeMode="cover"
+            />
+          ))}
+        </ScrollView>
+      )}
 
       {/* Bildirim Bilgileri */}
       <View style={styles.card}>
@@ -146,6 +165,15 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  imagesScroll: {
+    marginBottom: 16,
+  },
+  reportImage: {
+    width: 280,
+    height: 200,
+    borderRadius: 12,
+    marginRight: 10,
   },
   card: {
     backgroundColor: '#fff',

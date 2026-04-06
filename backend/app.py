@@ -1,4 +1,5 @@
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
 from config import Config
@@ -6,6 +7,7 @@ from models import db
 
 jwt = JWTManager()
 bcrypt = Bcrypt()
+
 
 def create_app():
     app = Flask(__name__)
@@ -23,11 +25,18 @@ def create_app():
     app.register_blueprint(user_bp, url_prefix="/api/user")
     app.register_blueprint(reports_bp, url_prefix="/api/reports")
 
+    # Yüklenen fotoğrafları serve et
+    @app.route("/uploads/<filename>")
+    def uploaded_file(filename):
+        upload_folder = os.path.join(app.root_path, "uploads")
+        return send_from_directory(upload_folder, filename)
+
     with app.app_context():
         db.create_all()
 
     return app
 
+
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host="0.0.0.0")
