@@ -4,11 +4,12 @@ from models import db, User
 
 user_bp = Blueprint("user", __name__)
 
+
 @user_bp.route("/profile", methods=["GET"])
 @jwt_required()
 def get_profile():
-    identity = get_jwt_identity()
-    user = User.query.get(identity["id"])
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
 
     if not user:
         return jsonify({"error": "Kullanıcı bulunamadı"}), 404
@@ -19,8 +20,8 @@ def get_profile():
 @user_bp.route("/profile", methods=["PUT"])
 @jwt_required()
 def update_profile():
-    identity = get_jwt_identity()
-    user = User.query.get(identity["id"])
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
 
     if not user:
         return jsonify({"error": "Kullanıcı bulunamadı"}), 404
