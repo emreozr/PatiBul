@@ -1,10 +1,12 @@
 import json
+import uuid
 
 
 def test_register_basarili(client):
+    unique_email = f"test_{uuid.uuid4().hex[:8]}@patibul.com"
     response = client.post('/api/auth/register',
         data=json.dumps({
-            'email': 'test@patibul.com',
+            'email': unique_email,
             'password': 'Sifre1234',
             'name': 'Test Kullanici',
             'role': 'user'
