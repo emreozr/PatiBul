@@ -17,6 +17,8 @@ class User(db.Model):
     clinic_name = db.Column(db.String(150), nullable=True)
     clinic_address = db.Column(db.String(255), nullable=True)
     clinic_hours = db.Column(db.String(100), nullable=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
 
     reports = db.relationship("PetReport", backref="owner", lazy=True)
 
@@ -30,6 +32,8 @@ class User(db.Model):
             "clinic_name": self.clinic_name,
             "clinic_address": self.clinic_address,
             "clinic_hours": self.clinic_hours,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "created_at": self.created_at.isoformat()
         }
 
