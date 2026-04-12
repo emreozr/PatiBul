@@ -1,35 +1,275 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+} from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import Colors from '../../styles/colors';
+import config from '../../config';
 
-const VetProfileScreen = () => (
-  <View style={styles.container}>
-    <Text style={styles.icon}>🏥</Text>
-    <Text style={styles.title}>Klinik Profilim</Text>
-    <Text style={styles.subtitle}>Bu ekran yakında gelecek!</Text>
-  </View>
-);
+export default function VetProfileScreen() {
+  const { token, user: authUser, login } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+
+  const [profile, setProfile] = useState({
+    name: '', email: '', phone: '',
+    clinic_name: '', clinic_address: '', clinic_hours: '',
+  });
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '',
+    clinic_name: '', clinic_address: '', clinic_hours: '',
+  });
+
+  useEffect(() => { fetchProfile(); }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch(`${config.API_URL}/user/profile`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        const u = data.user;
+        const loaded = {
+          name: u.name || '',
+          email: u.email || '',
+          phone: u.phone || '',
+          clinic_name: u.clinic_name || '',
+          clinic_address: u.clinic_address || '',
+          clinic_hours: u.clinic_hours || '',
+        };
+        setProfile(loaded);
+        setForm(loaded);
+      } else {
+        Alert.alert('Hata', data.error || 'Profil bilgileri alınamadı.');
+      }
+    } catch (e) {
+      Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!form.clinic_name.trim()) { Alert.alert('Uyarı', 'Klinik adı boş bırakılamaz.'); return; }
+    if (!form.clinic_address.trim()) { Alert.alert('Uyarı', 'Adres boş bırakılamaz.'); return; }
+    setSaving(true);
+    try {
+      const response = await fetch(`${config.API_URL}/user/profile`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          clinic_name: form.clinic_name.trim(),
+          clinic_address: form.clinic_address.trim(),
+          clinic_hours: form.clinic_hours.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        const updated = { ...form };
+        setProfile(updated);
+        login(token, { ...authUser, name: form.name.trim() });
+        setEditMode(false);
+        Alert.alert('Başarılı', 'Klinik bilgileriniz güncellendi.');
+      } else {
+        Alert.alert('Hata', data.error || 'Güncelleme başarısız.');
+      }
+    } catch (e) {
+      Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content}>
+
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarEmoji}>🏥</Text>
+            </View>
+            <Text style={styles.nameLabel}>{profile.clinic_name || 'Klinik Adı'}</Text>
+            <Text style={styles.emailLabel}>{profile.email}</Text>
+          </View>
+
+          {/* Kişisel Bilgiler */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>VETERİNER BİLGİLERİ</Text>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Ad Soyad</Text>
+              {editMode ? (
+                <TextInput
+                  style={styles.input}
+                  value={form.name}
+                  onChangeText={(t) => setForm({ ...form, name: t })}
+                  placeholder="Adınızı girin"
+                  placeholderTextColor={Colors.textLight}
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{profile.name || '—'}</Text>
+              )}
+            </View>
+
+            <View style={[styles.field, { marginBottom: 0 }]}>
+              <Text style={styles.fieldLabel}>Telefon</Text>
+              {editMode ? (
+                <TextInput
+                  style={styles.input}
+                  value={form.phone}
+                  onChangeText={(t) => setForm({ ...form, phone: t })}
+                  placeholder="Telefon numaranızı girin"
+                  placeholderTextColor={Colors.textLight}
+                  keyboardType="phone-pad"
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{profile.phone || '—'}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Klinik Bilgileri */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>KLİNİK BİLGİLERİ</Text>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Klinik Adı</Text>
+              {editMode ? (
+                <TextInput
+                  style={styles.input}
+                  value={form.clinic_name}
+                  onChangeText={(t) => setForm({ ...form, clinic_name: t })}
+                  placeholder="Klinik adını girin"
+                  placeholderTextColor={Colors.textLight}
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{profile.clinic_name || '—'}</Text>
+              )}
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Adres</Text>
+              {editMode ? (
+                <TextInput
+                  style={[styles.input, styles.multiline]}
+                  value={form.clinic_address}
+                  onChangeText={(t) => setForm({ ...form, clinic_address: t })}
+                  placeholder="Klinik adresini girin"
+                  placeholderTextColor={Colors.textLight}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{profile.clinic_address || '—'}</Text>
+              )}
+            </View>
+
+            <View style={[styles.field, { marginBottom: 0 }]}>
+              <Text style={styles.fieldLabel}>Çalışma Saatleri</Text>
+              {editMode ? (
+                <TextInput
+                  style={[styles.input, styles.multiline]}
+                  value={form.clinic_hours}
+                  onChangeText={(t) => setForm({ ...form, clinic_hours: t })}
+                  placeholder={'Örn: Pzt-Cum 09:00-18:00\nCmt 10:00-14:00'}
+                  placeholderTextColor={Colors.textLight}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              ) : (
+                <Text style={styles.fieldValue}>{profile.clinic_hours || '—'}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Butonlar */}
+          {editMode ? (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.cancelBtn]}
+                onPress={() => { setForm({ ...profile }); setEditMode(false); }}
+                disabled={saving}
+              >
+                <Text style={styles.cancelBtnText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={[styles.btn, styles.editBtn]} onPress={() => setEditMode(true)}>
+              <Text style={styles.editBtnText}>Klinik Bilgilerini Düzenle</Text>
+            </TouchableOpacity>
+          )}
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F7FA',
+  safeArea: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background },
+  content: { padding: 20, paddingBottom: 40 },
+  avatarContainer: { alignItems: 'center', marginVertical: 24 },
+  avatar: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  icon: {
-    fontSize: 60,
-    marginBottom: 16,
+  avatarEmoji: { fontSize: 36 },
+  nameLabel: { fontSize: 20, fontWeight: '700', color: Colors.textDark, textAlign: 'center' },
+  emailLabel: { fontSize: 13, color: Colors.textLight, marginTop: 4 },
+  card: {
+    backgroundColor: Colors.white, borderRadius: 16,
+    padding: 20, marginBottom: 16,
+    borderWidth: 1, borderColor: Colors.border,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1a1a2e',
-    marginBottom: 8,
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: Colors.textLight, letterSpacing: 1.2, marginBottom: 16 },
+  field: { marginBottom: 18 },
+  fieldLabel: { fontSize: 12, color: Colors.textLight, marginBottom: 6, fontWeight: '500' },
+  fieldValue: { fontSize: 16, color: Colors.textDark, fontWeight: '500' },
+  input: {
+    fontSize: 15, color: Colors.textDark,
+    borderWidth: 1.5, borderColor: Colors.primary,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    backgroundColor: Colors.background,
   },
-  subtitle: {
-    fontSize: 15,
-    color: '#888',
-  },
+  multiline: { minHeight: 80, paddingTop: 10 },
+  buttonRow: { flexDirection: 'row', gap: 12 },
+  btn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  editBtn: { backgroundColor: Colors.primary },
+  editBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  saveBtn: { backgroundColor: Colors.primary },
+  saveBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  cancelBtn: { backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.border },
+  cancelBtnText: { color: Colors.textDark, fontSize: 15, fontWeight: '600' },
 });
-
-export default VetProfileScreen;
