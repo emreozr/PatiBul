@@ -1,3 +1,6 @@
+// SCRUM-31: AllReportsScreen — Koordinatsız İlan Uyarısı
+// Konum bilgisi olmayan ilanlar için uyarı göstergesi eklendi
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -30,10 +33,22 @@ const statusConfig = {
 
 const radiusOptions = [5, 10, 25, 50];
 
+// SCRUM-31: Koordinatsız ilan uyarı bileşeni
+const NoLocationWarning = () => (
+  <View style={styles.noLocationWarning}>
+    <Text style={styles.noLocationIcon}>⚠️</Text>
+    <Text style={styles.noLocationText}>Konum bilgisi yok</Text>
+  </View>
+);
+
 const ReportCard = ({ item, onPress }) => {
   const type = typeConfig[item.report_type] || typeConfig.kayip;
   const status = statusConfig[item.status] || statusConfig.beklemede;
   const firstImage = item.images && item.images.length > 0 ? item.images[0] : null;
+
+  // SCRUM-31: Koordinat kontrolü
+  const hasLocation = item.latitude !== null && item.latitude !== undefined
+    && item.longitude !== null && item.longitude !== undefined;
 
   return (
     <TouchableOpacity style={styles.reportCard} onPress={() => onPress(item)}>
@@ -54,16 +69,24 @@ const ReportCard = ({ item, onPress }) => {
             <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
           </View>
         </View>
+
         <Text style={styles.reportAnimal}>{item.animal_type}</Text>
         <Text style={styles.reportDesc} numberOfLines={2}>{item.description}</Text>
+
         <View style={styles.reportFooter}>
-          <Text style={styles.reportLocation} numberOfLines={1}>
-            📍 {item.location_desc || 'Konum belirtilmedi'}
-          </Text>
+          {hasLocation ? (
+            <Text style={styles.reportLocation} numberOfLines={1}>
+              📍 {item.location_desc || 'Konum mevcut'}
+            </Text>
+          ) : (
+            // SCRUM-31: Koordinatsız ilan için uyarı
+            <NoLocationWarning />
+          )}
           {item.distance_km !== null && item.distance_km !== undefined && (
             <Text style={styles.distanceBadge}>📏 {item.distance_km} km</Text>
           )}
         </View>
+
         <View style={styles.reportBottom}>
           <Text style={styles.reportUser}>👤 {item.user_name}</Text>
           <Text style={styles.reportTime}>
@@ -127,13 +150,8 @@ const AllReportsScreen = ({ navigation }) => {
     }
   }, [activeTab, token, location, locationEnabled, radius]);
 
-  useEffect(() => {
-    getLocation();
-  }, []);
-
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
+  useEffect(() => { getLocation(); }, []);
+  useEffect(() => { fetchReports(); }, [fetchReports]);
 
   const tabs = [
     { key: 'tumu', label: 'Tümü' },
@@ -142,8 +160,22 @@ const AllReportsScreen = ({ navigation }) => {
     { key: 'yarali', label: '🏥 Yaralı' },
   ];
 
+  // SCRUM-31: Koordinatsız ilan sayısı gösterimi
+  const noLocationCount = reports.filter(r =>
+    r.latitude === null || r.latitude === undefined
+  ).length;
+
   return (
     <View style={styles.container}>
+      {/* SCRUM-31: Koordinatsız ilan uyarı banner'ı */}
+      {noLocationCount > 0 && (
+        <View style={styles.noLocationBanner}>
+          <Text style={styles.noLocationBannerText}>
+            ⚠️ {noLocationCount} ilanın konum bilgisi eksik
+          </Text>
+        </View>
+      )}
+
       {/* Konum Filtresi */}
       <View style={styles.locationBar}>
         <TouchableOpacity
@@ -218,200 +250,78 @@ const AllReportsScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
+  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  // SCRUM-31: Koordinatsız banner
+  noLocationBanner: {
+    backgroundColor: '#FFF3CD',
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: '#FFE69C',
   },
+  noLocationBannerText: { fontSize: 13, color: '#856404', fontWeight: '600' },
+  // SCRUM-31: Kart içi uyarı
+  noLocationWarning: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#FFF3CD', paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 8, alignSelf: 'flex-start',
+  },
+  noLocationIcon: { fontSize: 12 },
+  noLocationText: { fontSize: 12, color: '#856404', fontWeight: '600' },
   locationBar: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   locationToggle: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#ddd',
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1.5, borderColor: '#ddd', alignSelf: 'flex-start', marginBottom: 8,
   },
-  locationToggleActive: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#4CAF5011',
-  },
-  locationToggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#444',
-  },
-  locationToggleTextActive: {
-    color: '#4CAF50',
-  },
-  radiusScroll: {
-    flexGrow: 0,
-  },
+  locationToggleActive: { borderColor: '#4CAF50', backgroundColor: '#4CAF5011' },
+  locationToggleText: { fontSize: 13, fontWeight: '600', color: '#444' },
+  locationToggleTextActive: { color: '#4CAF50' },
+  radiusScroll: { flexGrow: 0 },
   radiusBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
+    borderWidth: 1, borderColor: '#ddd', marginRight: 8, backgroundColor: '#f5f5f5',
   },
-  radiusBtnActive: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  radiusBtnText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  radiusBtnTextActive: {
-    color: '#fff',
-    fontWeight: '700',
-  },
+  radiusBtnActive: { backgroundColor: '#4CAF50', borderColor: '#4CAF50' },
+  radiusBtnText: { fontSize: 12, color: '#666', fontWeight: '500' },
+  radiusBtnTextActive: { color: '#fff', fontWeight: '700' },
   tabsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexGrow: 0,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    paddingHorizontal: 16, paddingVertical: 10, flexGrow: 0,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8,
+    backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#e0e0e0',
   },
-  tabActive: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  tabText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  tabTextActive: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  loader: {
-    marginTop: 40,
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 30,
-  },
+  tabActive: { backgroundColor: '#4CAF50', borderColor: '#4CAF50' },
+  tabText: { fontSize: 13, color: '#666', fontWeight: '500' },
+  tabTextActive: { color: '#fff', fontWeight: '700' },
+  loader: { marginTop: 40 },
+  listContent: { padding: 16, paddingBottom: 30 },
   reportCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    overflow: 'hidden',
+    backgroundColor: '#fff', borderRadius: 14, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, overflow: 'hidden',
   },
-  cardImage: {
-    width: '100%',
-    height: 180,
-  },
-  cardContent: {
-    padding: 16,
-  },
-  reportCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  typeBadgeIcon: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  reportAnimal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a2e',
-    marginBottom: 4,
-  },
-  reportDesc: {
-    fontSize: 13,
-    color: '#555',
-    marginBottom: 10,
-  },
-  reportFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  reportLocation: {
-    fontSize: 12,
-    color: '#888',
-    flex: 1,
-  },
-  distanceBadge: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  reportBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  reportUser: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  reportTime: {
-    fontSize: 12,
-    color: '#aaa',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: '#aaa',
-  },
+  cardImage: { width: '100%', height: 180 },
+  cardContent: { padding: 16 },
+  reportCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  typeBadgeIcon: { fontSize: 12, marginRight: 4 },
+  typeBadgeText: { fontSize: 12, fontWeight: '700' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  reportAnimal: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 4 },
+  reportDesc: { fontSize: 13, color: '#555', marginBottom: 10 },
+  reportFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  reportLocation: { fontSize: 12, color: '#888', flex: 1 },
+  distanceBadge: { fontSize: 12, color: '#4CAF50', fontWeight: '600', marginLeft: 8 },
+  reportBottom: { flexDirection: 'row', justifyContent: 'space-between' },
+  reportUser: { fontSize: 12, color: '#4CAF50', fontWeight: '500' },
+  reportTime: { fontSize: 12, color: '#aaa' },
+  emptyContainer: { alignItems: 'center', paddingTop: 60 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyText: { fontSize: 15, color: '#aaa' },
 });
 
 export default AllReportsScreen;

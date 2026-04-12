@@ -29,7 +29,7 @@ export default function UserProfileScreen() {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch(`${config.API_URL}/user/profile`, {
+      const response = await fetch(`${config.API_URL}/api/user/profile`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
@@ -53,7 +53,7 @@ export default function UserProfileScreen() {
     if (!form.name.trim()) { Alert.alert('Uyarı', 'Ad alanı boş bırakılamaz.'); return; }
     setSaving(true);
     try {
-      const response = await fetch(`${config.API_URL}/user/profile`, {
+      const response = await fetch(`${config.API_URL}/api/user/profile`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: form.name.trim(), phone: form.phone.trim() }),
