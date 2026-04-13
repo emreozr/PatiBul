@@ -16,6 +16,8 @@ import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import config from '../../config';
 
+const API_URL = config.API_URL;
+
 export default function UserProfileScreen() {
   const { token, user: authUser, login } = useAuth();
   const [loading, setLoading] = useState(true);
