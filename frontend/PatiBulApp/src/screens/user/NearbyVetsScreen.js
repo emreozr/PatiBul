@@ -18,6 +18,8 @@ import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import config from '../../config';
 
+const API_URL = config.API_URL;
+
 const { width, height } = Dimensions.get('window');
 const radiusOptions = [5, 10, 25, 50];
 
