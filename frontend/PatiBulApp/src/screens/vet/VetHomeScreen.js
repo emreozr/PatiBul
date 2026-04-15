@@ -31,16 +31,31 @@ const statusConfig = {
 const ReportCard = ({ item, onPress }) => {
   const type = typeConfig[item.report_type] || typeConfig.kayip;
   const status = statusConfig[item.status] || statusConfig.beklemede;
+  const isCreatedRecently = (new Date() - new Date(item.created_at)) < 24 * 60 * 60 * 1000;
+  const isNew = item.status === 'beklemede' && isCreatedRecently;
 
   return (
-    <TouchableOpacity style={styles.reportCard} onPress={() => onPress(item)}>
+    <TouchableOpacity
+      style={[
+        styles.reportCard,
+        isNew && { borderColor: '#FF9500', borderWidth: 1 }
+      ]}
+      onPress={() => onPress(item)}
+    >
       <View style={styles.reportCardHeader}>
         <View style={[styles.typeBadge, { backgroundColor: type.color + '22' }]}>
           <Text style={styles.typeBadgeIcon}>{type.icon}</Text>
           <Text style={[styles.typeBadgeText, { color: type.color }]}>{type.label}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: status.color + '22' }]}>
-          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+        <View style={styles.rightBadgesContainer}>
+          {isNew && (
+            <View style={styles.newBadgeInline}>
+              <Text style={styles.newBadgeInlineText}>YENİ</Text>
+            </View>
+          )}
+          <View style={[styles.statusBadge, { backgroundColor: status.color + '22' }]}>
+            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+          </View>
         </View>
       </View>
       <Text style={styles.reportAnimal}>{item.animal_type}</Text>
@@ -57,28 +72,23 @@ const ReportCard = ({ item, onPress }) => {
 const VetHomeScreen = ({ navigation }) => {
   const { user, logout, token } = useAuth();
   const [activeTab, setActiveTab] = useState('beklemede');
-  const [reports, setReports] = useState([]);
+  const [allReports, setAllReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      const url =
-        activeTab === 'tumu'
-          ? `${API_URL}/api/reports/`
-          : `${API_URL}/api/reports/?status=${activeTab}`;
-
-      const response = await fetch(url, {
+      const response = await fetch(`${API_URL}/api/reports/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      if (response.ok) setReports(data.reports || []);
+      if (response.ok) setAllReports(data.reports || []);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [activeTab, token]);
+  }, [token]);
 
   useEffect(() => {
     fetchReports();
@@ -92,11 +102,19 @@ const VetHomeScreen = ({ navigation }) => {
   ];
 
   const stats = [
-    { label: 'Toplam', value: reports.length, color: '#fff' },
-    { label: 'Bekleyen', value: reports.filter(r => r.status === 'beklemede').length, color: '#FF9500' },
-    { label: 'İncelenen', value: reports.filter(r => r.status === 'inceleniyor').length, color: '#007AFF' },
-    { label: 'Tamamlanan', value: reports.filter(r => r.status === 'tamamlandi').length, color: '#34C759' },
+    { key: 'tumu', label: 'Toplam', value: allReports.length, color: '#fff' },
+    { key: 'beklemede', label: 'Bekleyen', value: allReports.filter(r => r.status === 'beklemede').length, color: '#FF9500' },
+    { key: 'inceleniyor', label: 'İncelenen', value: allReports.filter(r => r.status === 'inceleniyor').length, color: '#007AFF' },
+    { key: 'tamamlandi', label: 'Tamamlanan', value: allReports.filter(r => r.status === 'tamamlandi').length, color: '#34C759' },
   ];
+
+  const filteredReports = activeTab === 'tumu'
+    ? allReports
+    : allReports.filter(r => r.status === activeTab);
+
+  const yaraliReports = filteredReports.filter(r => r.report_type === 'yarali').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const otherReports = filteredReports.filter(r => r.report_type !== 'yarali').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const displayReports = [...yaraliReports, ...otherReports];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -119,10 +137,18 @@ const VetHomeScreen = ({ navigation }) => {
       {/* İstatistikler */}
       <View style={styles.statsRow}>
         {stats.map(s => (
-          <View key={s.label} style={styles.statBox}>
+          <TouchableOpacity
+            key={s.label}
+            style={[
+              styles.statBox,
+              activeTab === s.key && { backgroundColor: 'rgba(255,255,255,0.3)', borderWidth: 1, borderColor: s.color }
+            ]}
+            onPress={() => setActiveTab(s.key)}
+            activeOpacity={0.7}
+          >
             <Text style={[styles.statNumber, { color: s.color }]}>{s.value}</Text>
             <Text style={styles.statLabel}>{s.label}</Text>
-          </View>
+          </TouchableOpacity>
         ))}
       </View>
 
@@ -151,7 +177,7 @@ const VetHomeScreen = ({ navigation }) => {
           <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
         ) : (
           <FlatList
-            data={reports}
+            data={displayReports}
             keyExtractor={item => item.id.toString()}
             renderItem={({ item }) => (
               <ReportCard
@@ -201,6 +227,29 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  placeholderBadgeContainer: {
+    position: 'relative',
+    marginRight: 16,
+    padding: 4,
+  },
+  placeholderBadgeIcon: {
+    fontSize: 24,
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    backgroundColor: '#FF3B30',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
   avatarContainer: {
     width: 44,
@@ -290,6 +339,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
+  },
+  newBadgeInline: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginRight: 6,
+  },
+  newBadgeInlineText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  rightBadgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   reportCardHeader: {
     flexDirection: 'row',
