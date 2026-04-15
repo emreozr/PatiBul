@@ -8,7 +8,10 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Modal,
+  Dimensions,
 } from 'react-native';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import config from '../../config';
@@ -28,6 +31,7 @@ const VetReportDetailScreen = ({ route }) => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(report.status);
+  const [isMapVisible, setIsMapVisible] = useState(false);
 
   const currentStatus = statusConfig[status];
 
@@ -89,8 +93,8 @@ const VetReportDetailScreen = ({ route }) => {
     report.report_type === 'kayip'
       ? '🚨 Kayıp'
       : report.report_type === 'yarali'
-      ? '🏥 Yaralı'
-      : '🐕 Bulunan';
+        ? '🏥 Yaralı'
+        : '🐕 Bulunan';
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -113,7 +117,43 @@ const VetReportDetailScreen = ({ route }) => {
         <Text style={styles.value}>{report.description}</Text>
 
         <Text style={styles.label}>Konum</Text>
-        <Text style={styles.value}>{report.location_desc || 'Belirtilmedi'}</Text>
+        {report.location_desc ? (
+          <Text style={[styles.value, { marginBottom: 8 }]}>
+            <Text style={{ fontWeight: '600' }}>Konum Açıklaması: </Text>
+            {report.location_desc}
+          </Text>
+        ) : null}
+
+        {report.latitude && report.longitude ? (
+          <TouchableOpacity
+            style={styles.mapPreviewContainer}
+            onPress={() => setIsMapVisible(true)}
+            activeOpacity={0.9}
+          >
+            <MapView
+              style={styles.mapPreview}
+              provider={PROVIDER_DEFAULT}
+              initialRegion={{
+                latitude: report.latitude,
+                longitude: report.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+              pointerEvents="none"
+            >
+              <Marker coordinate={{ latitude: report.latitude, longitude: report.longitude }} />
+            </MapView>
+            <View style={styles.mapOverlay}>
+              <Text style={styles.mapOverlayText}>Büyütmek için dokunun</Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.value}>Konum belirtilmedi</Text>
+        )}
 
         <Text style={styles.label}>Gönderen</Text>
         <Text style={styles.value}>{report.user_name}</Text>
@@ -162,6 +202,31 @@ const VetReportDetailScreen = ({ route }) => {
       )}
 
       <View style={styles.bottomSpace} />
+
+      {report.latitude && report.longitude && (
+        <Modal visible={isMapVisible} animationType="slide" transparent={false}>
+          <View style={styles.fullScreenMapContainer}>
+            <TouchableOpacity
+              style={styles.closeMapBtn}
+              onPress={() => setIsMapVisible(false)}
+            >
+              <Text style={styles.closeMapText}>✕</Text>
+            </TouchableOpacity>
+            <MapView
+              style={styles.fullScreenMap}
+              provider={PROVIDER_DEFAULT}
+              initialRegion={{
+                latitude: report.latitude,
+                longitude: report.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+            >
+              <Marker coordinate={{ latitude: report.latitude, longitude: report.longitude }} />
+            </MapView>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 };
@@ -266,6 +331,59 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 40,
+  },
+  mapPreviewContainer: {
+    height: 150,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  mapPreview: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: 6,
+    alignItems: 'center',
+  },
+  mapOverlayText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  fullScreenMapContainer: {
+    flex: 1,
+  },
+  fullScreenMap: {
+    flex: 1,
+  },
+  closeMapBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  closeMapText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
 });
 
