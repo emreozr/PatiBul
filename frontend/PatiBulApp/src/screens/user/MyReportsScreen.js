@@ -1,16 +1,14 @@
+// SCRUM-54: Bildirim silme özelliği
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
+  View, Text, StyleSheet, FlatList,
+  TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import useApi from '../../hooks/useApi';
 import ErrorScreen from '../../components/ErrorScreen';
 import { ErrorBanner } from '../../components/ErrorScreen';
+import config from '../../config';
 
 const typeConfig = {
   kayip: { label: 'Kayıp', color: '#FF6B6B', icon: '🚨' },
@@ -24,9 +22,20 @@ const statusConfig = {
   tamamlandi: { label: 'Tamamlandı', color: '#34C759' },
 };
 
-const MyReportCard = ({ item, onPress }) => {
+const MyReportCard = ({ item, onPress, onDelete }) => {
   const type = typeConfig[item.report_type] || typeConfig.kayip;
   const status = statusConfig[item.status] || statusConfig.beklemede;
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Bildirimi Sil',
+      'Bu bildirimi silmek istediğinize emin misiniz?',
+      [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Sil', style: 'destructive', onPress: () => onDelete(item.id) },
+      ]
+    );
+  };
 
   return (
     <TouchableOpacity style={styles.reportCard} onPress={() => onPress(item)}>
@@ -35,8 +44,14 @@ const MyReportCard = ({ item, onPress }) => {
           <Text style={styles.typeBadgeIcon}>{type.icon}</Text>
           <Text style={[styles.typeBadgeText, { color: type.color }]}>{type.label}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: status.color + '22' }]}>
-          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+        <View style={styles.headerRight}>
+          <View style={[styles.statusBadge, { backgroundColor: status.color + '22' }]}>
+            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+          </View>
+          {/* SCRUM-54: Silme butonu */}
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+            <Text style={styles.deleteBtnText}>🗑️</Text>
+          </TouchableOpacity>
         </View>
       </View>
       <Text style={styles.reportAnimal}>{item.animal_type}</Text>
@@ -59,19 +74,33 @@ const MyReportCard = ({ item, onPress }) => {
 const MyReportsScreen = ({ navigation }) => {
   const { token } = useAuth();
   const [reports, setReports] = useState([]);
-
   const { loading, error, execute } = useApi();
 
   const fetchMyReports = useCallback(async () => {
     const result = await execute('/api/reports/my', { token });
-    if (result) {
-      setReports(result.reports || []);
-    }
+    if (result) setReports(result.reports || []);
   }, [token, execute]);
 
-  useEffect(() => {
-    fetchMyReports();
-  }, [fetchMyReports]);
+  useEffect(() => { fetchMyReports(); }, [fetchMyReports]);
+
+  // SCRUM-54: Silme işlemi
+  const handleDelete = async (reportId) => {
+    try {
+      const response = await fetch(`${config.API_URL}/api/reports/${reportId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        setReports(prev => prev.filter(r => r.id !== reportId));
+        Alert.alert('Başarılı', 'Bildirim silindi.');
+      } else {
+        const data = await response.json();
+        Alert.alert('Hata', data.error || 'Silme işlemi başarısız.');
+      }
+    } catch (e) {
+      Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
+    }
+  };
 
   if (error && reports.length === 0) {
     return (
@@ -86,7 +115,6 @@ const MyReportsScreen = ({ navigation }) => {
       {error && reports.length > 0 && (
         <ErrorBanner errorType={error.type} onRetry={fetchMyReports} />
       )}
-
       {loading ? (
         <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
       ) : (
@@ -98,15 +126,14 @@ const MyReportsScreen = ({ navigation }) => {
             <MyReportCard
               item={item}
               onPress={r => navigation.navigate('ReportDetail', { report: r })}
+              onDelete={handleDelete}
             />
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📭</Text>
               <Text style={styles.emptyText}>Henüz bildiriminiz yok</Text>
-              <Text style={styles.emptySubtext}>
-                Ana sayfadan bildirim oluşturabilirsiniz
-              </Text>
+              <Text style={styles.emptySubtext}>Ana sayfadan bildirim oluşturabilirsiniz</Text>
             </View>
           }
           contentContainerStyle={styles.listContent}
@@ -120,110 +147,35 @@ const MyReportsScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  loader: {
-    marginTop: 40,
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 30,
-  },
+  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  loader: { marginTop: 40 },
+  listContent: { padding: 16, paddingBottom: 30 },
   reportCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  reportCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  typeBadgeIcon: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  reportAnimal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a2e',
-    marginBottom: 4,
-  },
-  reportDesc: {
-    fontSize: 13,
-    color: '#555',
-    marginBottom: 10,
-  },
-  reportFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  reportLocation: {
-    fontSize: 12,
-    color: '#888',
-  },
-  reportTime: {
-    fontSize: 12,
-    color: '#aaa',
-  },
-  vetResponseBanner: {
-    marginTop: 8,
-    backgroundColor: '#007AFF22',
-    borderRadius: 8,
-    padding: 8,
-  },
-  vetResponseBannerText: {
-    fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#aaa',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  emptySubtext: {
-    fontSize: 13,
-    color: '#bbb',
-  },
+  reportCardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  typeBadgeIcon: { fontSize: 12, marginRight: 4 },
+  typeBadgeText: { fontSize: 12, fontWeight: '700' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  // SCRUM-54: Silme butonu stili
+  deleteBtn: { padding: 4 },
+  deleteBtnText: { fontSize: 18 },
+  reportAnimal: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e', marginBottom: 4 },
+  reportDesc: { fontSize: 13, color: '#555', marginBottom: 10 },
+  reportFooter: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  reportLocation: { fontSize: 12, color: '#888' },
+  reportTime: { fontSize: 12, color: '#aaa' },
+  vetResponseBanner: { marginTop: 8, backgroundColor: '#007AFF22', borderRadius: 8, padding: 8 },
+  vetResponseBannerText: { fontSize: 12, color: '#007AFF', fontWeight: '600' },
+  emptyContainer: { alignItems: 'center', paddingTop: 60 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyText: { fontSize: 16, color: '#aaa', fontWeight: '600', marginBottom: 6 },
+  emptySubtext: { fontSize: 13, color: '#bbb' },
 });
 
 export default MyReportsScreen;
