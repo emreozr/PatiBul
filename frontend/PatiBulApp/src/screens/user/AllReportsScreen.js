@@ -16,6 +16,9 @@ import {
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import config from '../../config';
+import useApi from '../../hooks/useApi';
+import ErrorScreen from '../../components/ErrorScreen';
+import { ErrorBanner } from '../../components/ErrorScreen';
 
 const API_URL = config.API_URL;
 
@@ -101,11 +104,12 @@ const ReportCard = ({ item, onPress }) => {
 const AllReportsScreen = ({ navigation }) => {
   const { token } = useAuth();
   const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tumu');
   const [location, setLocation] = useState(null);
   const [radius, setRadius] = useState(10);
   const [locationEnabled, setLocationEnabled] = useState(false);
+
+  const { loading, error, execute, retry } = useApi();
 
   const getLocation = useCallback(async () => {
     try {
@@ -123,32 +127,24 @@ const AllReportsScreen = ({ navigation }) => {
   }, []);
 
   const fetchReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      let url = `${API_URL}/api/reports/`;
-      const params = new URLSearchParams();
+    let endpoint = '/api/reports/';
+    const params = new URLSearchParams();
 
-      if (activeTab !== 'tumu') params.append('type', activeTab);
-      if (locationEnabled && location) {
-        params.append('lat', location.latitude);
-        params.append('lon', location.longitude);
-        params.append('radius', radius);
-      }
-
-      const queryString = params.toString();
-      if (queryString) url += `?${queryString}`;
-
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (response.ok) setReports(data.reports || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    if (activeTab !== 'tumu') params.append('type', activeTab);
+    if (locationEnabled && location) {
+      params.append('lat', location.latitude);
+      params.append('lon', location.longitude);
+      params.append('radius', radius);
     }
-  }, [activeTab, token, location, locationEnabled, radius]);
+
+    const queryString = params.toString();
+    if (queryString) endpoint += `?${queryString}`;
+
+    const result = await execute(endpoint, { token });
+    if (result) {
+      setReports(result.reports || []);
+    }
+  }, [activeTab, token, location, locationEnabled, radius, execute]);
 
   useEffect(() => { getLocation(); }, []);
   useEffect(() => { fetchReports(); }, [fetchReports]);
@@ -165,8 +161,20 @@ const AllReportsScreen = ({ navigation }) => {
     r.latitude === null || r.latitude === undefined
   ).length;
 
+  if (error && reports.length === 0) {
+    return (
+      <View style={styles.container}>
+        <ErrorScreen errorType={error.type} onRetry={fetchReports} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      {error && reports.length > 0 && (
+        <ErrorBanner errorType={error.type} onRetry={fetchReports} />
+      )}
+
       {/* SCRUM-31: Koordinatsız ilan uyarı banner'ı */}
       {noLocationCount > 0 && (
         <View style={styles.noLocationBanner}>
@@ -223,6 +231,7 @@ const AllReportsScreen = ({ navigation }) => {
         <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={reports}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => (
@@ -286,7 +295,7 @@ const styles = StyleSheet.create({
   radiusBtnText: { fontSize: 12, color: '#666', fontWeight: '500' },
   radiusBtnTextActive: { color: '#fff', fontWeight: '700' },
   tabsContainer: {
-    paddingHorizontal: 16, paddingVertical: 10, flexGrow: 0,
+    paddingHorizontal: 16, paddingVertical: 10, flexGrow: 0, flexShrink: 0,
     backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   tab: {
