@@ -4,9 +4,7 @@ import InputField from '../components/InputField';
 import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
 import { useAuth } from '../context/AuthContext';
-import config from '../config';
-
-const API_URL = config.API_URL;
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../services/api';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -24,27 +22,24 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const { data } = await apiFetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('Hata', data.error || 'Giriş başarısız.');
-        return;
-      }
-
       // Token ve kullanıcı bilgisini AuthContext'e kaydet
-      // navigation.replace('Home') KALDIRILDI — token set edilince app.js otomatik yönlendirir
       login(data.access_token, data.user);
-
     } catch (error) {
-      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor. Lütfen tekrar deneyin.');
+      if (error instanceof ApiError) {
+        if (error.type === ERROR_TYPES.CLIENT) {
+          Alert.alert('Hata', error.data?.error || error.message);
+        } else {
+          const errorInfo = ERROR_MESSAGES[error.type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN];
+          Alert.alert(errorInfo.title, errorInfo.message);
+        }
+      } else {
+        Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }

@@ -8,9 +8,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import config from '../../config';
-
-const API_URL = config.API_URL;
+import useApi from '../../hooks/useApi';
+import ErrorScreen from '../../components/ErrorScreen';
+import { ErrorBanner } from '../../components/ErrorScreen';
 
 const typeConfig = {
   kayip: { label: 'Kayıp', color: '#FF6B6B', icon: '🚨' },
@@ -59,33 +59,39 @@ const MyReportCard = ({ item, onPress }) => {
 const MyReportsScreen = ({ navigation }) => {
   const { token } = useAuth();
   const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const { loading, error, execute } = useApi();
 
   const fetchMyReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/reports/my`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (response.ok) setReports(data.reports || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    const result = await execute('/api/reports/my', { token });
+    if (result) {
+      setReports(result.reports || []);
     }
-  }, [token]);
+  }, [token, execute]);
 
   useEffect(() => {
     fetchMyReports();
   }, [fetchMyReports]);
 
+  if (error && reports.length === 0) {
+    return (
+      <View style={styles.container}>
+        <ErrorScreen errorType={error.type} onRetry={fetchMyReports} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      {error && reports.length > 0 && (
+        <ErrorBanner errorType={error.type} onRetry={fetchMyReports} />
+      )}
+
       {loading ? (
         <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={reports}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => (

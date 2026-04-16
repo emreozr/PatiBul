@@ -1,7 +1,9 @@
 import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import Colors from './src/styles/colors';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 // Auth Screens
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -113,7 +115,15 @@ function VetNavigator() {
 }
 
 function AppNavigator() {
-  const { token, user } = useAuth();
+  const { token, user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   if (!token) return <AuthNavigator />;
   if (user?.role === 'vet') return <VetNavigator />;
@@ -122,10 +132,12 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <AppNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
