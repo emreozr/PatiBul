@@ -16,9 +16,8 @@ import {
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
-import config from '../../config';
-
-const API_URL = config.API_URL;
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
+import { ErrorBanner } from '../../components/ErrorScreen';
 
 const { width, height } = Dimensions.get('window');
 const radiusOptions = [5, 10, 25, 50];
@@ -33,6 +32,7 @@ export default function NearbyVetsScreen() {
   const [locationError, setLocationError] = useState(false);
   const [radius, setRadius] = useState(10);
   const [selectedVet, setSelectedVet] = useState(null);
+  const [fetchError, setFetchError] = useState(null);
 
   const requestLocation = useCallback(async () => {
     try {
@@ -54,19 +54,16 @@ export default function NearbyVetsScreen() {
 
   const fetchVets = useCallback(async (coords, selectedRadius) => {
     setLoading(true);
+    setFetchError(null);
     try {
-      let url = `${config.API_URL}/api/user/vets`;
+      let endpoint = '/api/user/vets';
       if (coords) {
-        url += `?lat=${coords.latitude}&lon=${coords.longitude}&radius=${selectedRadius}`;
+        endpoint += `?lat=${coords.latitude}&lon=${coords.longitude}&radius=${selectedRadius}`;
       }
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setVets(data.vets || []);
-      }
-    } catch (e) {
+      const { data } = await apiFetch(endpoint, { token });
+      setVets(data.vets || []);
+    } catch (error) {
+      setFetchError(error instanceof ApiError ? error : { type: ERROR_TYPES.UNKNOWN });
       setVets([]);
     } finally {
       setLoading(false);
@@ -118,6 +115,13 @@ export default function NearbyVetsScreen() {
 
   return (
     <View style={styles.container}>
+      {fetchError && (
+        <ErrorBanner
+          errorType={fetchError.type}
+          onRetry={() => fetchVets(location, radius)}
+        />
+      )}
+
       {/* Harita */}
       <MapView
         ref={mapRef}

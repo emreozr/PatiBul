@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import config from '../../config';
+import useApi from '../../hooks/useApi';
+import ErrorScreen from '../../components/ErrorScreen';
 
 const API_URL = config.API_URL;
 
@@ -74,7 +76,6 @@ const ReportDetailScreen = ({ route }) => {
   const { report } = route.params;
   const { token } = useAuth();
   const [responses, setResponses] = useState([]);
-  const [loading, setLoading] = useState(true);
   // SCRUM-32: Bildirim state'leri
   const [notification, setNotification] = useState({ visible: false, message: '' });
   const prevResponseCount = useRef(0);
@@ -83,34 +84,27 @@ const ReportDetailScreen = ({ route }) => {
   const type = typeConfig[report.report_type] || typeConfig.kayip;
   const status = statusConfig[report.status] || statusConfig.beklemede;
 
+  const { loading, error, execute, retry } = useApi();
+
   const fetchResponses = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/reports/${report.id}/responses`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        const newResponses = data.responses || [];
+    const result = await execute(`/api/reports/${report.id}/responses`, { token });
+    if (result) {
+      const newResponses = result.responses || [];
 
-        // SCRUM-32: İlk yüklemeden sonra yeni yanıt gelirse bildirim göster
-        if (!isFirstLoad.current && newResponses.length > prevResponseCount.current) {
-          const latestResponse = newResponses[0];
-          setNotification({
-            visible: true,
-            message: latestResponse?.message || 'Yeni yanıt geldi',
-          });
-        }
-
-        prevResponseCount.current = newResponses.length;
-        isFirstLoad.current = false;
-        setResponses(newResponses);
+      // SCRUM-32: İlk yüklemeden sonra yeni yanıt gelirse bildirim göster
+      if (!isFirstLoad.current && newResponses.length > prevResponseCount.current) {
+        const latestResponse = newResponses[0];
+        setNotification({
+          visible: true,
+          message: latestResponse?.message || 'Yeni yanıt geldi',
+        });
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+
+      prevResponseCount.current = newResponses.length;
+      isFirstLoad.current = false;
+      setResponses(newResponses);
     }
-  }, [report.id, token]);
+  }, [report.id, token, execute]);
 
   useEffect(() => {
     fetchResponses();
@@ -118,6 +112,9 @@ const ReportDetailScreen = ({ route }) => {
     const interval = setInterval(fetchResponses, 30000);
     return () => clearInterval(interval);
   }, [fetchResponses]);
+
+  if (error && responses.length === 0 && !loading) {
+  }
 
   return (
     <View style={styles.wrapper}>
@@ -184,6 +181,12 @@ const ReportDetailScreen = ({ route }) => {
 
         {loading ? (
           <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
+        ) : error ? (
+          <ErrorScreen
+            errorType={error.type}
+            onRetry={fetchResponses}
+            style={styles.inlineError}
+          />
         ) : responses.length === 0 ? (
           <View style={styles.noResponseCard}>
             <Text style={styles.noResponseIcon}>⏳</Text>
@@ -254,6 +257,10 @@ const styles = StyleSheet.create({
   },
   responsesCount: { fontSize: 12, color: '#fff', fontWeight: '700' },
   loader: { marginTop: 20 },
+  inlineError: {
+    flex: 0,
+    paddingVertical: 40,
+  },
   noResponseCard: {
     backgroundColor: '#fff', borderRadius: 14, padding: 24, alignItems: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },

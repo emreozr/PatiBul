@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
-import config from '../../config';
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
+import ErrorScreen from '../../components/ErrorScreen';
 
 export default function VetProfileScreen() {
   const { token, user: authUser, login } = useAuth();
@@ -23,6 +24,7 @@ export default function VetProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   const [profile, setProfile] = useState({
     name: '', email: '', phone: '',
@@ -38,31 +40,32 @@ export default function VetProfileScreen() {
   useEffect(() => { fetchProfile(); }, []);
 
   const fetchProfile = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      const response = await fetch(`${config.API_URL}/api/user/profile`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        const u = data.user;
-        const loaded = {
-          name: u.name || '',
-          email: u.email || '',
-          phone: u.phone || '',
-          clinic_name: u.clinic_name || '',
-          clinic_address: u.clinic_address || '',
-          clinic_hours: u.clinic_hours || '',
-          latitude: u.latitude || null,
-          longitude: u.longitude || null,
-        };
-        setProfile(loaded);
-        setForm(loaded);
+      const { data } = await apiFetch('/api/user/profile', { token });
+      const u = data.user;
+      const loaded = {
+        name: u.name || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        clinic_name: u.clinic_name || '',
+        clinic_address: u.clinic_address || '',
+        clinic_hours: u.clinic_hours || '',
+        latitude: u.latitude || null,
+        longitude: u.longitude || null,
+      };
+      setProfile(loaded);
+      setForm(loaded);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setLoadError(error);
+        if (error.type === ERROR_TYPES.CLIENT) {
+          Alert.alert('Hata', error.data?.error || 'Profil bilgileri alınamadı.');
+        }
       } else {
-        Alert.alert('Hata', data.error || 'Profil bilgileri alınamadı.');
+        setLoadError({ type: ERROR_TYPES.UNKNOWN });
       }
-    } catch (e) {
-      Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
     } finally {
       setLoading(false);
     }
@@ -95,10 +98,10 @@ export default function VetProfileScreen() {
     if (!form.clinic_address.trim()) { Alert.alert('Uyarı', 'Adres boş bırakılamaz.'); return; }
     setSaving(true);
     try {
-      const response = await fetch(`${config.API_URL}/api/user/profile`, {
+      await apiFetch('/api/user/profile', {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        token,
+        body: {
           name: form.name.trim(),
           phone: form.phone.trim(),
           clinic_name: form.clinic_name.trim(),
@@ -106,19 +109,24 @@ export default function VetProfileScreen() {
           clinic_hours: form.clinic_hours.trim(),
           latitude: form.latitude,
           longitude: form.longitude,
-        }),
+        },
       });
-      const data = await response.json();
-      if (response.ok) {
-        setProfile({ ...form });
-        login(token, { ...authUser, name: form.name.trim() });
-        setEditMode(false);
-        Alert.alert('Başarılı', 'Klinik bilgileriniz güncellendi.');
+
+      setProfile({ ...form });
+      login(token, { ...authUser, name: form.name.trim() });
+      setEditMode(false);
+      Alert.alert('Başarılı', 'Klinik bilgileriniz güncellendi.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.type === ERROR_TYPES.CLIENT) {
+          Alert.alert('Hata', error.data?.error || 'Güncelleme başarısız.');
+        } else {
+          const errorInfo = ERROR_MESSAGES[error.type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN];
+          Alert.alert(errorInfo.title, errorInfo.message);
+        }
       } else {
-        Alert.alert('Hata', data.error || 'Güncelleme başarısız.');
+        Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
       }
-    } catch (e) {
-      Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
     } finally {
       setSaving(false);
     }
@@ -129,6 +137,14 @@ export default function VetProfileScreen() {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
+    );
+  }
+
+  if (loadError && !profile.email) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ErrorScreen errorType={loadError.type} onRetry={fetchProfile} />
+      </SafeAreaView>
     );
   }
 

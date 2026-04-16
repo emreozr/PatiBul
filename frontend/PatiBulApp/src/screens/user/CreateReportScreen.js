@@ -13,9 +13,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
-import config from '../../config';
-
-const API_URL = config.API_URL;
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
 
 const typeConfig = {
   kayip: { label: 'Kayıp İlanı', icon: '🚨', color: '#FF6B6B' },
@@ -114,28 +112,18 @@ const CreateReportScreen = ({ route, navigation }) => {
     setLoading(true);
     try {
       // 1. Bildirimi oluştur
-      const response = await fetch(`${API_URL}/api/reports/`, {
+      const { data } = await apiFetch('/api/reports/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           report_type: type,
           animal_type: animalType,
           description,
           location_desc: locationDesc,
           latitude: location?.latitude,
           longitude: location?.longitude,
-        }),
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('Hata', data.error || 'Bildirim oluşturulamadı.');
-        return;
-      }
 
       const reportId = data.report.id;
 
@@ -149,13 +137,12 @@ const CreateReportScreen = ({ route, navigation }) => {
           type: `image/${ext}`,
         });
 
-        await fetch(`${API_URL}/api/reports/${reportId}/upload-image`, {
+        await apiFetch(`/api/reports/${reportId}/upload-image`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
+          token,
           body: formData,
+          isFormData: true,
+          timeout: 30000,
         });
       }
 
@@ -163,7 +150,16 @@ const CreateReportScreen = ({ route, navigation }) => {
         { text: 'Tamam', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor.');
+      if (error instanceof ApiError) {
+        if (error.type === ERROR_TYPES.CLIENT) {
+          Alert.alert('Hata', error.data?.error || error.message);
+        } else {
+          const errorInfo = ERROR_MESSAGES[error.type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN];
+          Alert.alert(errorInfo.title, errorInfo.message);
+        }
+      } else {
+        Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor.');
+      }
     } finally {
       setLoading(false);
     }

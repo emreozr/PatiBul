@@ -14,9 +14,7 @@ import {
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
-import config from '../../config';
-
-const API_URL = config.API_URL;
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
 
 const statusConfig = {
   beklemede: { label: 'Beklemede', color: '#FF9500' },
@@ -43,27 +41,26 @@ const VetReportDetailScreen = ({ route }) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/reports/${report.id}/respond`, {
+      await apiFetch(`/api/reports/${report.id}/respond`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ message }),
+        token,
+        body: { message },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('Hata', data.error || 'Yanıt gönderilemedi.');
-        return;
-      }
 
       setStatus('inceleniyor');
       setMessage('');
       Alert.alert('Başarılı', 'Yanıtınız gönderildi.');
-    } catch (e) {
-      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.type === ERROR_TYPES.CLIENT) {
+          Alert.alert('Hata', error.data?.error || error.message);
+        } else {
+          const errorInfo = ERROR_MESSAGES[error.type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN];
+          Alert.alert(errorInfo.title, errorInfo.message);
+        }
+      } else {
+        Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor.');
+      }
     } finally {
       setLoading(false);
     }
@@ -71,21 +68,21 @@ const VetReportDetailScreen = ({ route }) => {
 
   const handleStatusUpdate = async newStatus => {
     try {
-      const response = await fetch(`${API_URL}/api/reports/${report.id}/status`, {
+      await apiFetch(`/api/reports/${report.id}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
+        token,
+        body: { status: newStatus },
       });
 
-      if (response.ok) {
-        setStatus(newStatus);
-        Alert.alert('Başarılı', 'Durum güncellendi.');
+      setStatus(newStatus);
+      Alert.alert('Başarılı', 'Durum güncellendi.');
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const errorInfo = ERROR_MESSAGES[error.type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN];
+        Alert.alert(errorInfo.title, errorInfo.message);
+      } else {
+        Alert.alert('Hata', 'Durum güncellenemedi.');
       }
-    } catch (e) {
-      Alert.alert('Hata', 'Durum güncellenemedi.');
     }
   };
 

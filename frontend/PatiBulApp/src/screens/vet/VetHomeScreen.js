@@ -4,17 +4,17 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   FlatList,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
-import config from '../../config';
-
-const API_URL = config.API_URL;
+import useApi from '../../hooks/useApi';
+import ErrorScreen from '../../components/ErrorScreen';
+import { ErrorBanner } from '../../components/ErrorScreen';
 
 const typeConfig = {
   kayip: { label: 'Kayıp', color: '#FF6B6B', icon: '🚨' },
@@ -73,22 +73,15 @@ const VetHomeScreen = ({ navigation }) => {
   const { user, logout, token } = useAuth();
   const [activeTab, setActiveTab] = useState('beklemede');
   const [allReports, setAllReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const { loading, error, execute, retry } = useApi();
 
   const fetchReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/reports/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (response.ok) setAllReports(data.reports || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    const result = await execute('/api/reports/', { token });
+    if (result) {
+      setAllReports(result.reports || []);
     }
-  }, [token]);
+  }, [token, execute]);
 
   useEffect(() => {
     fetchReports();
@@ -115,6 +108,23 @@ const VetHomeScreen = ({ navigation }) => {
   const yaraliReports = filteredReports.filter(r => r.report_type === 'yarali').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const otherReports = filteredReports.filter(r => r.report_type !== 'yarali').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const displayReports = [...yaraliReports, ...otherReports];
+
+  if (error && allReports.length === 0) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerGreeting}>Veteriner Paneli 🏥</Text>
+            <Text style={styles.headerName}>{user?.clinic_name || user?.name}</Text>
+          </View>
+        </View>
+        <View style={styles.content}>
+          <ErrorScreen errorType={error.type} onRetry={fetchReports} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -153,6 +163,10 @@ const VetHomeScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.content}>
+        {error && allReports.length > 0 && (
+          <ErrorBanner errorType={error.type} onRetry={fetchReports} />
+        )}
+
         {/* Sekmeler */}
         <ScrollView
           horizontal
@@ -177,6 +191,7 @@ const VetHomeScreen = ({ navigation }) => {
           <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
         ) : (
           <FlatList
+            style={{ flex: 1 }}
             data={displayReports}
             keyExtractor={item => item.id.toString()}
             renderItem={({ item }) => (
@@ -299,6 +314,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 12,
     flexGrow: 0,
+    flexShrink: 0,
   },
   tab: {
     paddingHorizontal: 16,
