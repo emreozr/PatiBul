@@ -235,3 +235,46 @@ def get_responses(report_id):
         .all()
     )
     return jsonify({"responses": [r.to_dict() for r in responses]}), 200
+
+# ─── SCRUM-54: Kullanıcı: Bildirim sil ───────────────────────────────────────
+@reports_bp.route("/<int:report_id>", methods=["DELETE"])
+@jwt_required()
+def delete_report(report_id):
+    user_id = get_jwt_identity()
+    report = PetReport.query.get_or_404(report_id)
+
+    if report.user_id != int(user_id):
+        return jsonify({"error": "Bu bildirimi silemezsiniz"}), 403
+
+    db.session.delete(report)
+    db.session.commit()
+
+    return jsonify({"message": "Bildirim silindi"}), 200
+
+
+# ─── SCRUM-55: Kullanıcı: Bildirim düzenle ───────────────────────────────────
+@reports_bp.route("/<int:report_id>", methods=["PUT"])
+@jwt_required()
+def update_report(report_id):
+    user_id = get_jwt_identity()
+    report = PetReport.query.get_or_404(report_id)
+
+    if report.user_id != int(user_id):
+        return jsonify({"error": "Bu bildirimi düzenleyemezsiniz"}), 403
+
+    data = request.get_json()
+
+    if "animal_type" in data and data["animal_type"]:
+        report.animal_type = data["animal_type"]
+    if "description" in data and data["description"]:
+        report.description = data["description"]
+    if "location_desc" in data:
+        report.location_desc = data["location_desc"]
+    if "latitude" in data:
+        report.latitude = data["latitude"]
+    if "longitude" in data:
+        report.longitude = data["longitude"]
+
+    db.session.commit()
+
+    return jsonify({"message": "Bildirim güncellendi", "report": report.to_dict()}), 200

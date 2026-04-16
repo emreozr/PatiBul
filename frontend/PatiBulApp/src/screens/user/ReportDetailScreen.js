@@ -1,16 +1,10 @@
-// SCRUM-32: ReportDetailScreen — Veteriner Yanıtı Uygulama İçi Bildirimi
-// Veteriner yanıt verdiğinde kullanıcıya uygulama içi bildirim gösterilir
+// SCRUM-32: Veteriner yanıtı uygulama içi bildirimi
+// SCRUM-55: Bildirim düzenleme butonu eklendi
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  Image,
-  Animated,
-  TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, ActivityIndicator,
+  Image, Animated, TouchableOpacity,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import config from '../../config';
@@ -31,33 +25,18 @@ const statusConfig = {
   tamamlandi: { label: 'Tamamlandı', color: '#34C759' },
 };
 
-// SCRUM-32: Uygulama içi bildirim bileşeni
 const InAppNotification = ({ visible, message, onDismiss }) => {
   const slideAnim = useRef(new Animated.Value(-100)).current;
-
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 10,
-      }).start();
-
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
       const timer = setTimeout(() => {
-        Animated.timing(slideAnim, {
-          toValue: -100,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(onDismiss);
+        Animated.timing(slideAnim, { toValue: -100, duration: 300, useNativeDriver: true }).start(onDismiss);
       }, 4000);
-
       return () => clearTimeout(timer);
     }
   }, [visible]);
-
   if (!visible) return null;
-
   return (
     <Animated.View style={[styles.notification, { transform: [{ translateY: slideAnim }] }]}>
       <Text style={styles.notificationIcon}>🏥</Text>
@@ -72,34 +51,25 @@ const InAppNotification = ({ visible, message, onDismiss }) => {
   );
 };
 
-const ReportDetailScreen = ({ route }) => {
+const ReportDetailScreen = ({ route, navigation }) => {
   const { report } = route.params;
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [responses, setResponses] = useState([]);
-  // SCRUM-32: Bildirim state'leri
   const [notification, setNotification] = useState({ visible: false, message: '' });
   const prevResponseCount = useRef(0);
   const isFirstLoad = useRef(true);
 
   const type = typeConfig[report.report_type] || typeConfig.kayip;
   const status = statusConfig[report.status] || statusConfig.beklemede;
-
-  const { loading, error, execute, retry } = useApi();
+  const { loading, error, execute } = useApi();
 
   const fetchResponses = useCallback(async () => {
     const result = await execute(`/api/reports/${report.id}/responses`, { token });
     if (result) {
       const newResponses = result.responses || [];
-
-      // SCRUM-32: İlk yüklemeden sonra yeni yanıt gelirse bildirim göster
       if (!isFirstLoad.current && newResponses.length > prevResponseCount.current) {
-        const latestResponse = newResponses[0];
-        setNotification({
-          visible: true,
-          message: latestResponse?.message || 'Yeni yanıt geldi',
-        });
+        setNotification({ visible: true, message: newResponses[0]?.message || 'Yeni yanıt geldi' });
       }
-
       prevResponseCount.current = newResponses.length;
       isFirstLoad.current = false;
       setResponses(newResponses);
@@ -108,24 +78,22 @@ const ReportDetailScreen = ({ route }) => {
 
   useEffect(() => {
     fetchResponses();
-    // SCRUM-32: Her 30 saniyede bir yeni yanıt kontrol et
     const interval = setInterval(fetchResponses, 30000);
     return () => clearInterval(interval);
   }, [fetchResponses]);
 
-  if (error && responses.length === 0 && !loading) {
-  }
+  // SCRUM-55: Kullanıcı kendi ilanını mı görüyor?
+  const canEdit = user && String(report.user_id) === String(user.id);
 
   return (
     <View style={styles.wrapper}>
-      {/* SCRUM-32: Uygulama içi bildirim */}
       <InAppNotification
         visible={notification.visible}
         message={notification.message}
         onDismiss={() => setNotification({ visible: false, message: '' })}
       />
-
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+
         {/* Tip Banner */}
         <View style={[styles.typeBanner, { backgroundColor: type.color + '22', borderColor: type.color }]}>
           <Text style={styles.typeBannerIcon}>{type.icon}</Text>
@@ -135,16 +103,22 @@ const ReportDetailScreen = ({ route }) => {
           </View>
         </View>
 
+        {/* SCRUM-55: Düzenle butonu - sadece ilan sahibine göster */}
+        {canEdit && (
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => navigation.navigate('EditReport', { report })}
+          >
+            <Text style={styles.editBtnText}>✏️ Bildirimi Düzenle</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Fotoğraflar */}
         {report.images && report.images.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
             {report.images.map(img => (
-              <Image
-                key={img.id}
-                source={{ uri: `${API_URL}${img.image_url}` }}
-                style={styles.reportImage}
-                resizeMode="cover"
-              />
+              <Image key={img.id} source={{ uri: `${API_URL}${img.image_url}` }}
+                style={styles.reportImage} resizeMode="cover" />
             ))}
           </ScrollView>
         )}
@@ -153,20 +127,14 @@ const ReportDetailScreen = ({ route }) => {
         <View style={styles.card}>
           <Text style={styles.label}>Hayvan Türü</Text>
           <Text style={styles.value}>{report.animal_type}</Text>
-
           <Text style={styles.label}>Açıklama</Text>
           <Text style={styles.value}>{report.description}</Text>
-
           <Text style={styles.label}>Konum</Text>
           <Text style={styles.value}>{report.location_desc || 'Belirtilmedi'}</Text>
-
           <Text style={styles.label}>İlan Sahibi</Text>
           <Text style={styles.value}>{report.user_name}</Text>
-
           <Text style={styles.label}>Tarih</Text>
-          <Text style={styles.value}>
-            {new Date(report.created_at).toLocaleDateString('tr-TR')}
-          </Text>
+          <Text style={styles.value}>{new Date(report.created_at).toLocaleDateString('tr-TR')}</Text>
         </View>
 
         {/* Veteriner Yanıtları */}
@@ -182,33 +150,24 @@ const ReportDetailScreen = ({ route }) => {
         {loading ? (
           <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
         ) : error ? (
-          <ErrorScreen
-            errorType={error.type}
-            onRetry={fetchResponses}
-            style={styles.inlineError}
-          />
+          <ErrorScreen errorType={error.type} onRetry={fetchResponses} style={styles.inlineError} />
         ) : responses.length === 0 ? (
           <View style={styles.noResponseCard}>
             <Text style={styles.noResponseIcon}>⏳</Text>
             <Text style={styles.noResponseText}>Henüz veteriner yanıtı yok</Text>
-            <Text style={styles.noResponseSubtext}>
-              Bildiriminiz veterinerler tarafından inceleniyor
-            </Text>
+            <Text style={styles.noResponseSubtext}>Bildiriminiz veterinerler tarafından inceleniyor</Text>
           </View>
         ) : (
           responses.map(r => (
             <View key={r.id} style={styles.responseCard}>
               <View style={styles.responseHeader}>
                 <Text style={styles.responseVet}>🏥 {r.vet_clinic || r.vet_name}</Text>
-                <Text style={styles.responseTime}>
-                  {new Date(r.created_at).toLocaleDateString('tr-TR')}
-                </Text>
+                <Text style={styles.responseTime}>{new Date(r.created_at).toLocaleDateString('tr-TR')}</Text>
               </View>
               <Text style={styles.responseMessage}>{r.message}</Text>
             </View>
           ))
         )}
-
         <View style={styles.bottomSpace} />
       </ScrollView>
     </View>
@@ -217,14 +176,11 @@ const ReportDetailScreen = ({ route }) => {
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1 },
-  // SCRUM-32: Bildirim stilleri
   notification: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 999,
-    backgroundColor: '#1a1a2e',
-    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1a1a2e', flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 10,
   },
   notificationIcon: { fontSize: 24, marginRight: 12 },
   notificationContent: { flex: 1 },
@@ -234,37 +190,34 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F7FA', padding: 20 },
   typeBanner: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16,
+    borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 12,
   },
   typeBannerIcon: { fontSize: 24, marginRight: 8 },
   typeBannerText: { fontSize: 16, fontWeight: 'bold', flex: 1 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 12, fontWeight: '700' },
+  editBtn: {
+    backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5,
+    borderColor: '#1a1a2e', padding: 10, alignItems: 'center', marginBottom: 16,
+  },
+  editBtnText: { fontSize: 14, fontWeight: '700', color: '#1a1a2e' },
   imagesScroll: { marginBottom: 16 },
   reportImage: { width: 280, height: 200, borderRadius: 12, marginRight: 10 },
   card: {
     backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 24,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   label: { fontSize: 12, color: '#aaa', fontWeight: '600', marginTop: 12, marginBottom: 4 },
   value: { fontSize: 15, color: '#333' },
   responsesHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e' },
-  responsesCountBadge: {
-    backgroundColor: '#007AFF', borderRadius: 12,
-    paddingHorizontal: 8, paddingVertical: 2,
-  },
+  responsesCountBadge: { backgroundColor: '#007AFF', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
   responsesCount: { fontSize: 12, color: '#fff', fontWeight: '700' },
   loader: { marginTop: 20 },
-  inlineError: {
-    flex: 0,
-    paddingVertical: 40,
-  },
+  inlineError: { flex: 0, paddingVertical: 40 },
   noResponseCard: {
     backgroundColor: '#fff', borderRadius: 14, padding: 24, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   noResponseIcon: { fontSize: 36, marginBottom: 10 },
   noResponseText: { fontSize: 15, fontWeight: '600', color: '#555', marginBottom: 6 },
@@ -272,8 +225,7 @@ const styles = StyleSheet.create({
   responseCard: {
     backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12,
     borderLeftWidth: 4, borderLeftColor: '#007AFF',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   responseHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   responseVet: { fontSize: 13, fontWeight: '700', color: '#007AFF' },
