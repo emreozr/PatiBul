@@ -6,9 +6,7 @@ import {
 import InputField from '../components/InputField';
 import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
-import config from '../config';
-
-const API_URL = config.API_URL;
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../services/api';
 
 const RegisterScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -26,30 +24,30 @@ const RegisterScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
+      await apiFetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           name: username,
           email: email,
           password: password,
           role: role,
-        }),
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('Hata', data.error || 'Kayıt başarısız.');
-        return;
-      }
 
       Alert.alert('Başarılı', 'Kayıt işlemi başarılı!', [
         { text: 'Tamam', onPress: () => navigation.navigate('Login') }
       ]);
-
     } catch (error) {
-      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor. Lütfen tekrar deneyin.');
+      if (error instanceof ApiError) {
+        if (error.type === ERROR_TYPES.CLIENT) {
+          Alert.alert('Hata', error.data?.error || error.message);
+        } else {
+          const errorInfo = ERROR_MESSAGES[error.type] || ERROR_MESSAGES[ERROR_TYPES.UNKNOWN];
+          Alert.alert(errorInfo.title, errorInfo.message);
+        }
+      } else {
+        Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
