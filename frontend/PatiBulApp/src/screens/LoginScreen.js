@@ -78,6 +78,13 @@ const LoginScreen = ({ navigation }) => {
           type="secondary"
           onPress={() => navigation.navigate('Register')}
         />
+
+        <Text
+          style={styles.forgotPasswordLink}
+          onPress={() => navigation.navigate('ForgotPassword')}
+        >
+          Şifremi Unuttum?
+        </Text>
       </View>
     </View>
   );
@@ -110,6 +117,13 @@ const styles = StyleSheet.create({
   loginButton: {
     marginTop: 20,
     marginBottom: 10,
+  },
+  forgotPasswordLink: {
+    color: Colors.primary,
+    fontSize: 14,
+    marginTop: 10,
+    textAlign: 'right',
+    textDecorationLine: 'underline',
   },
 });
 
