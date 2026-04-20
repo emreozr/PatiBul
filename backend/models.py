@@ -13,6 +13,7 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="user")
     phone = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    profile_photo = db.Column(db.String(255), nullable=True)  # Yeni alan
 
     clinic_name = db.Column(db.String(150), nullable=True)
     clinic_address = db.Column(db.String(255), nullable=True)
@@ -34,7 +35,8 @@ class User(db.Model):
             "clinic_hours": self.clinic_hours,
             "latitude": self.latitude,
             "longitude": self.longitude,
-            "created_at": self.created_at.isoformat()
+            "created_at": self.created_at.isoformat(),
+            "profile_photo": self.profile_photo,  # Yeni alan
         }
 
 
@@ -60,6 +62,7 @@ class PetReport(db.Model):
             "id": self.id,
             "user_id": self.user_id,
             "user_name": self.owner.name if self.owner else None,
+            "user_photo": self.owner.profile_photo if self.owner else None,  # Yeni
             "report_type": self.report_type,
             "animal_type": self.animal_type,
             "description": self.description,

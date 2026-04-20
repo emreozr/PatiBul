@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
 import ErrorScreen from '../../components/ErrorScreen';
+import ImagePicker from 'react-native-image-picker';
 
 export default function UserProfileScreen() {
   const { token, user: authUser, login } = useAuth();
@@ -24,8 +25,8 @@ export default function UserProfileScreen() {
   const [editMode, setEditMode] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
-  const [profile, setProfile] = useState({ name: '', email: '', phone: '' });
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [profile, setProfile] = useState({ name: '', email: '', phone: '', profile_photo: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', profile_photo: '' });
 
   useEffect(() => { fetchProfile(); }, []);
 
@@ -35,7 +36,7 @@ export default function UserProfileScreen() {
     try {
       const { data } = await apiFetch('/api/user/profile', { token });
       const u = data.user;
-      const loaded = { name: u.name || '', email: u.email || '', phone: u.phone || '' };
+      const loaded = { name: u.name || '', email: u.email || '', phone: u.phone || '', profile_photo: u.profile_photo || '' };
       setProfile(loaded);
       setForm(loaded);
     } catch (error) {
@@ -84,6 +85,60 @@ export default function UserProfileScreen() {
     }
   };
 
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Galeri izni verilmedi.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Kamera izni verilmedi.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadPhoto = async () => {
+    if (!photoUri) return;
+    setSaving(true);
+    try {
+      await uploadProfilePhoto(token, photoUri);
+      const updated = { ...profile, profile_photo: photoUri.replace(config.API_URL + '/', '') };
+      setProfile(updated);
+      setForm(updated);
+      login(token, { ...authUser, profile_photo: updated.profile_photo });
+      Alert.alert('Başarılı', 'Fotoğraf yüklendi.');
+    } catch (error) {
+      Alert.alert('Hata', 'Fotoğraf yüklenemedi.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -107,11 +162,26 @@ export default function UserProfileScreen() {
 
           {/* Avatar */}
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {profile.name ? profile.name.charAt(0).toUpperCase() : '?'}
-              </Text>
-            </View>
+            <TouchableOpacity onPress={() => editMode && Alert.alert('Fotoğraf Seç', '', [
+              { text: 'Galeri', onPress: pickImage },
+              { text: 'Kamera', onPress: takePhoto },
+              { text: 'İptal', style: 'cancel' },
+            ])}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {profile.name ? profile.name.charAt(0).toUpperCase() : '?'}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {editMode && photoUri !== (profile.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null) && (
+              <TouchableOpacity style={styles.uploadBtn} onPress={uploadPhoto} disabled={saving}>
+                <Text style={styles.uploadBtnText}>Fotoğrafı Yükle</Text>
+              </TouchableOpacity>
+            )}
             <Text style={styles.nameLabel}>{profile.name}</Text>
             <Text style={styles.emailLabel}>{profile.email}</Text>
           </View>
@@ -154,6 +224,34 @@ export default function UserProfileScreen() {
                 />
               ) : (
                 <Text style={styles.fieldValue}>{profile.phone || '—'}</Text>
+              )}
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Profil Fotoğrafı</Text>
+              {profile.profile_photo ? (
+                <View style={styles.imageContainer}>
+                  <Image source={profile.profile_photo} style={styles.image} />
+                </View>
+              ) : (
+                <View style={styles.imageContainer}>
+                  <Text style={styles.imagePlaceholder}>Fotoğraf yükleniyor...</Text>
+                </View>
+              )}
+              {editMode && (
+                <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+                  <Text style={styles.imagePickerBtnText}>Galeriden Seç</Text>
+                </TouchableOpacity>
+              )}
+              {editMode && (
+                <TouchableOpacity style={styles.imagePickerBtn} onPress={takePhoto}>
+                  <Text style={styles.imagePickerBtnText}>Kameradan Al</Text>
+                </TouchableOpacity>
+              )}
+              {editMode && (
+                <TouchableOpacity style={styles.imagePickerBtn} onPress={uploadPhoto}>
+                  <Text style={styles.imagePickerBtnText}>Yükle</Text>
+                </TouchableOpacity>
               )}
             </View>
           </View>
@@ -221,4 +319,11 @@ const styles = StyleSheet.create({
   saveBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
   cancelBtn: { backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.border },
   cancelBtnText: { color: Colors.textDark, fontSize: 15, fontWeight: '600' },
+  imageContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
+  image: { width: 100, height: 100, borderRadius: 50 },
+  imagePlaceholder: { fontSize: 16, color: Colors.textLight },
+  imagePickerBtn: { backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 10 },
+  imagePickerBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  uploadBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.primary, borderRadius: 8 },
+  uploadBtnText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
 });

@@ -7,9 +7,11 @@ import {
   ScrollView,
   SafeAreaView,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
+import config from '../../config';
 
 const QuickActionCard = ({ icon, title, subtitle, color, onPress }) => (
   <TouchableOpacity style={[styles.card, { borderLeftColor: color }]} onPress={onPress}>
@@ -39,7 +41,14 @@ const UserHomeScreen = ({ navigation }) => {
           style={styles.avatarContainer}
           onPress={() => navigation.navigate('UserProfile')}
         >
-          <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
+          {user?.profile_photo ? (
+            <Image
+              source={{ uri: `${config.API_URL}/${user.profile_photo}` }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -151,6 +160,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   content: {
     flex: 1,
