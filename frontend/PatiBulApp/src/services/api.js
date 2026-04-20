@@ -158,4 +158,25 @@ export const api = {
     }),
 };
 
+export const uploadProfilePhoto = async (token, photoUri) => {
+  const formData = new FormData();
+  const fileName = photoUri.split('/').pop();
+  const fileType = fileName.split('.').pop();
+
+  formData.append('photo', {
+    uri: photoUri,
+    name: fileName,
+    type: `image/${fileType}`,
+  });
+
+  return apiFetch('/api/user/profile/photo', {
+    method: 'POST',
+    token,
+    body: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
 export default api;

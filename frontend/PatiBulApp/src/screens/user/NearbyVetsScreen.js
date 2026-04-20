@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
 import { ErrorBanner } from '../../components/ErrorScreen';
+import config from '../../config';
 
 const { width, height } = Dimensions.get('window');
 const radiusOptions = [5, 10, 25, 50];
@@ -354,4 +355,7 @@ const styles = StyleSheet.create({
   },
   locationErrorText: { fontSize: 13, color: '#856404' },
   locationErrorRetry: { fontSize: 13, color: '#856404', fontWeight: '700' },
+  cancelBtnText: { color: Colors.textDark, fontSize: 15, fontWeight: '600' },
+  uploadBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.primary, borderRadius: 8 },
+  uploadBtnText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
 });

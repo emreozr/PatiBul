@@ -1,3 +1,12 @@
+import os
+from werkzeug.utils import secure_filename
+from flask import current_app
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User
@@ -38,6 +47,7 @@ def update_profile():
     data = request.get_json()
     user.name = data.get("name", user.name)
     user.phone = data.get("phone", user.phone)
+    user.profile_photo = data.get("profile_photo", user.profile_photo)  # Yeni alan
 
     if user.role == "vet":
         user.clinic_name = data.get("clinic_name", user.clinic_name)
@@ -73,3 +83,36 @@ def get_vets():
             result.append(d)
     result.sort(key=lambda x: (x["distance_km"] is None, x["distance_km"] or 0))
     return jsonify({"vets": result}), 200
+
+
+@user_bp.route("/profile/photo", methods=["POST"])
+@jwt_required()
+def upload_profile_photo():
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+
+    if 'photo' not in request.files:
+        return jsonify({"error": "Fotoğraf dosyası bulunamadı"}), 400
+
+    file = request.files['photo']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({"error": "Geçersiz dosya"}), 400
+
+    filename = secure_filename(f"user_{user_id}_{file.filename}")
+    upload_folder = os.path.join(current_app.root_path, 'uploads', 'profiles')
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, filename)
+    file.save(file_path)
+
+    # Eski fotoğrafı sil (varsa)
+    if user.profile_photo:
+        old_path = os.path.join(current_app.root_path, user.profile_photo)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    user.profile_photo = f"uploads/profiles/{filename}"
+    db.session.commit()
+
+    return jsonify({"message": "Fotoğraf yüklendi", "photo_url": user.profile_photo}), 200

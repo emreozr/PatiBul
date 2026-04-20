@@ -15,6 +15,10 @@ import Colors from '../../styles/colors';
 import useApi from '../../hooks/useApi';
 import ErrorScreen from '../../components/ErrorScreen';
 import { ErrorBanner } from '../../components/ErrorScreen';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
+import { uploadProfilePhoto } from '../../services/api';
+import config from '../../config';
 
 const typeConfig = {
   kayip: { label: 'Kayıp', color: '#FF6B6B', icon: '🚨' },
@@ -140,7 +144,11 @@ const VetHomeScreen = ({ navigation }) => {
           style={styles.avatarContainer}
           onPress={() => navigation.navigate('VetProfile')}
         >
-          <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
+          {user?.profile_photo ? (
+            <Image source={{ uri: `${config.API_URL}/${user.profile_photo}` }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -278,6 +286,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   statsRow: {
     flexDirection: 'row',
@@ -455,6 +468,18 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontWeight: '600',
     fontSize: 15,
+  },
+  uploadBtn: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+  },
+  uploadBtnText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -13,9 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
+import { uploadProfilePhoto } from '../../services/api';
 import ErrorScreen from '../../components/ErrorScreen';
 
 export default function VetProfileScreen() {
