@@ -276,6 +276,20 @@ export default function UserProfileScreen() {
             </TouchableOpacity>
           )}
 
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ChangePassword')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 15,
+              borderBottomWidth: 1,
+              borderBottomColor: '#ECECEC',
+            }}
+          >
+            <Text style={{ fontSize: 16, color: colors.text, flex: 1 }}>🔐 Şifre Değiştir</Text>
+            <Text style={{ fontSize: 16, color: '#CCC' }}>›</Text>
+          </TouchableOpacity>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

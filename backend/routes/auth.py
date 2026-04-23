@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import db, User, PasswordResetToken
 from app import bcrypt, mail
 from config import Config
@@ -170,3 +170,47 @@ def reset_password():
     db.session.commit()
     
     return jsonify({"message": "Şifreniz başarıyla sıfırlandı"}), 200
+
+
+@auth_bp.route("/change-password", methods=["PUT"])
+@jwt_required()
+def change_password():
+    """Kullanıcının şifresini değiştir"""
+    try:
+        data = request.get_json()
+        
+        # Zorunlu alanları kontrol et
+        if not data.get("current_password") or not data.get("new_password") or not data.get("confirm_password"):
+            return jsonify({"error": "Tüm alanlar zorunludur"}), 400
+        
+        # Yeni şifreler eşleşiyor mu?
+        if data["new_password"] != data["confirm_password"]:
+            return jsonify({"error": "Yeni şifreler eşleşmiyor"}), 400
+        
+        # Yeni şifre en az 6 karakter olmalı
+        if len(data["new_password"]) < 6:
+            return jsonify({"error": "Yeni şifre en az 6 karakter olmalıdır"}), 400
+        
+        # Kullanıcıyı bul
+        user_id = get_jwt_identity()
+        user = User.query.get(int(user_id))
+        
+        if not user:
+            return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+        
+        # Mevcut şifre doğru mu?
+        if not bcrypt.check_password_hash(user.password, data["current_password"]):
+            return jsonify({"error": "Mevcut şifre yanlış"}), 401
+        
+        # Yeni şifre eski şifrenin aynı mı?
+        if bcrypt.check_password_hash(user.password, data["new_password"]):
+            return jsonify({"error": "Yeni şifre eski şifrenizle aynı olamaz"}), 400
+        
+        # Şifreyi güncelle
+        user.password = bcrypt.generate_password_hash(data["new_password"]).decode("utf-8")
+        db.session.commit()
+        
+        return jsonify({"message": "Şifre başarıyla değiştirildi"}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
