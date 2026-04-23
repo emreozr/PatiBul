@@ -20,7 +20,7 @@ import UserProfileScreen from './src/screens/user/UserProfileScreen';
 import AllReportsScreen from './src/screens/user/AllReportsScreen';
 import MyReportsScreen from './src/screens/user/MyReportsScreen';
 import ReportDetailScreen from './src/screens/user/ReportDetailScreen';
-import ChangePasswordScreen from './screens/user/ChangePasswordScreen';
+import ChangePasswordScreen from './src/screens/user/ChangePasswordScreen';
 
 // Vet Screens
 import VetHomeScreen from './src/screens/vet/VetHomeScreen';
