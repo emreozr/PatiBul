@@ -13,7 +13,7 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="user")
     phone = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    profile_photo = db.Column(db.String(255), nullable=True)  # Yeni alan
+    profile_photo = db.Column(db.String(255), nullable=True)
 
     clinic_name = db.Column(db.String(150), nullable=True)
     clinic_address = db.Column(db.String(255), nullable=True)
@@ -36,19 +36,18 @@ class User(db.Model):
             "latitude": self.latitude,
             "longitude": self.longitude,
             "created_at": self.created_at.isoformat(),
-            "profile_photo": self.profile_photo,  # Yeni alan
+            "profile_photo": self.profile_photo,
         }
-
 
 class PetReport(db.Model):
     __tablename__ = "pet_reports"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    report_type = db.Column(db.String(20), nullable=False)  # kayip, bulunan, yarali
-    animal_type = db.Column(db.String(50), nullable=False)  # kedi, köpek, vb.
+    report_type = db.Column(db.String(20), nullable=False)
+    animal_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default="beklemede")  # beklemede, inceleniyor, tamamlandi
+    status = db.Column(db.String(20), default="beklemede")
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
     location_desc = db.Column(db.String(255), nullable=True)
@@ -62,7 +61,7 @@ class PetReport(db.Model):
             "id": self.id,
             "user_id": self.user_id,
             "user_name": self.owner.name if self.owner else None,
-            "user_photo": self.owner.profile_photo if self.owner else None,  # Yeni
+            "user_photo": self.owner.profile_photo if self.owner else None,
             "report_type": self.report_type,
             "animal_type": self.animal_type,
             "description": self.description,
@@ -73,7 +72,6 @@ class PetReport(db.Model):
             "images": [img.to_dict() for img in self.images],
             "created_at": self.created_at.isoformat()
         }
-
 
 class ReportImage(db.Model):
     __tablename__ = "report_images"
@@ -90,7 +88,6 @@ class ReportImage(db.Model):
             "image_url": self.image_url,
             "uploaded_at": self.uploaded_at.isoformat()
         }
-
 
 class VetResponse(db.Model):
     __tablename__ = "vet_responses"
@@ -113,6 +110,7 @@ class VetResponse(db.Model):
             "message": self.message,
             "created_at": self.created_at.isoformat()
         }
+
 class PasswordResetToken(db.Model):
     __tablename__ = "password_reset_tokens"
 

@@ -10,18 +10,18 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image, // react-native'den import edildi (Çökme önlemi)
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
-import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
-import { uploadProfilePhoto } from '../../services/api';
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES, uploadProfilePhoto } from '../../services/api';
 import ErrorScreen from '../../components/ErrorScreen';
+import { config } from '../../config'; // API_URL için eklendi (dosya yolunu kontrol et)
 
-export default function VetProfileScreen() {
+export default function VetProfileScreen({ navigation }) { // navigation eklendi (şifre değiştirme vb. gerekirse diye)
   const { token, user: authUser, login } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,13 +29,16 @@ export default function VetProfileScreen() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
+  // Fotoğraf State'i Eklendi (Çökme hatasını çözen kısım)
+  const [photoUri, setPhotoUri] = useState(null);
+
   const [profile, setProfile] = useState({
-    name: '', email: '', phone: '',
+    name: '', email: '', phone: '', profile_photo: '', // profile_photo eklendi
     clinic_name: '', clinic_address: '', clinic_hours: '',
     latitude: null, longitude: null,
   });
   const [form, setForm] = useState({
-    name: '', email: '', phone: '',
+    name: '', email: '', phone: '', profile_photo: '', // profile_photo eklendi
     clinic_name: '', clinic_address: '', clinic_hours: '',
     latitude: null, longitude: null,
   });
@@ -52,6 +55,7 @@ export default function VetProfileScreen() {
         name: u.name || '',
         email: u.email || '',
         phone: u.phone || '',
+        profile_photo: u.profile_photo || '', // Backend'den foto verisi çekiliyor
         clinic_name: u.clinic_name || '',
         clinic_address: u.clinic_address || '',
         clinic_hours: u.clinic_hours || '',
@@ -74,6 +78,62 @@ export default function VetProfileScreen() {
     }
   };
 
+  // --- FOTOĞRAF İŞLEMLERİ EKLENDİ ---
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Galeri izni verilmedi.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Kamera izni verilmedi.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const uploadPhoto = async () => {
+    if (!photoUri) return;
+    setSaving(true);
+    try {
+      await uploadProfilePhoto(token, photoUri);
+      const updated = { ...profile, profile_photo: photoUri.replace(config.API_URL + '/', '') };
+      setProfile(updated);
+      setForm(updated);
+      login(token, { ...authUser, profile_photo: updated.profile_photo });
+      Alert.alert('Başarılı', 'Fotoğraf yüklendi.');
+    } catch (error) {
+      Alert.alert('Hata', 'Fotoğraf yüklenemedi.');
+    } finally {
+      setSaving(false);
+    }
+  };
+  // ----------------------------------
+
   const handleGetLocation = async () => {
     setLocationLoading(true);
     try {
@@ -82,7 +142,9 @@ export default function VetProfileScreen() {
         Alert.alert('İzin Gerekli', 'Konum izni verilmedi.');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced, // Daha hızlı ve güvenilir konum alması için eklendi
+      });
       setForm({
         ...form,
         latitude: loc.coords.latitude,
@@ -156,13 +218,32 @@ export default function VetProfileScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content}>
 
-          {/* Avatar */}
+          {/* Avatar / Profil Fotoğrafı Alanı Güvenli Hale Getirildi */}
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarEmoji}>🏥</Text>
-            </View>
-            <Text style={styles.nameLabel}>{profile.clinic_name || 'Klinik Adı'}</Text>
-            <Text style={styles.emailLabel}>{profile.email}</Text>
+            <TouchableOpacity onPress={() => editMode && Alert.alert('Fotoğraf Seç', '', [
+              { text: 'Galeri', onPress: pickImage },
+              { text: 'Kamera', onPress: takePhoto },
+              { text: 'İptal', style: 'cancel' },
+            ])}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatar} />
+              ) : profile?.profile_photo ? (
+                <Image source={{ uri: `${config.API_URL}/${profile.profile_photo}` }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarEmoji}>🏥</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {editMode && photoUri !== (profile?.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null) && (
+              <TouchableOpacity style={styles.uploadBtn} onPress={uploadPhoto} disabled={saving}>
+                <Text style={styles.uploadBtnText}>Fotoğrafı Yükle</Text>
+              </TouchableOpacity>
+            )}
+            
+            <Text style={styles.nameLabel}>{profile?.clinic_name || 'Klinik Adı'}</Text>
+            <Text style={styles.emailLabel}>{profile?.email}</Text>
           </View>
 
           {/* Veteriner Bilgileri */}
@@ -180,7 +261,7 @@ export default function VetProfileScreen() {
                   placeholderTextColor={Colors.textLight}
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.name || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.name || '—'}</Text>
               )}
             </View>
 
@@ -196,7 +277,7 @@ export default function VetProfileScreen() {
                   keyboardType="phone-pad"
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.phone || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.phone || '—'}</Text>
               )}
             </View>
           </View>
@@ -216,7 +297,7 @@ export default function VetProfileScreen() {
                   placeholderTextColor={Colors.textLight}
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.clinic_name || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.clinic_name || '—'}</Text>
               )}
             </View>
 
@@ -234,7 +315,7 @@ export default function VetProfileScreen() {
                   textAlignVertical="top"
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.clinic_address || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.clinic_address || '—'}</Text>
               )}
             </View>
 
@@ -252,14 +333,14 @@ export default function VetProfileScreen() {
                   textAlignVertical="top"
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.clinic_hours || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.clinic_hours || '—'}</Text>
               )}
             </View>
 
             {/* Konum */}
             <View style={[styles.field, { marginBottom: 0 }]}>
               <Text style={styles.fieldLabel}>Klinik Konumu (Harita için)</Text>
-              {profile.latitude && profile.longitude ? (
+              {profile?.latitude && profile?.longitude ? (
                 <Text style={styles.locationSet}>
                   ✅ Konum ayarlandı ({profile.latitude.toFixed(4)}, {profile.longitude.toFixed(4)})
                 </Text>
@@ -301,6 +382,22 @@ export default function VetProfileScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Normal kullanıcıda olduğu gibi Veteriner de şifresini değiştirmek isterse diye link eklendi */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ChangePassword')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 15,
+              borderBottomWidth: 1,
+              borderBottomColor: '#ECECEC',
+              marginTop: 10
+            }}
+          >
+            <Text style={{ fontSize: 16, color: Colors.textDark, flex: 1 }}>🔐 Şifre Değiştir</Text>
+            <Text style={{ fontSize: 16, color: '#CCC' }}>›</Text>
+          </TouchableOpacity>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -316,6 +413,7 @@ const styles = StyleSheet.create({
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: Colors.primary,
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
+    overflow: 'hidden' // Resmin yuvarlak dışına taşmasını engeller
   },
   avatarEmoji: { fontSize: 36 },
   nameLabel: { fontSize: 20, fontWeight: '700', color: Colors.textDark, textAlign: 'center' },
@@ -336,7 +434,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   multiline: { minHeight: 80, paddingTop: 10 },
-  locationSet: { fontSize: 13, color: Colors.success, fontWeight: '600', marginBottom: 8 },
+  locationSet: { fontSize: 13, color: '#28a745', fontWeight: '600', marginBottom: 8 }, // Colors.success hatasına karşı hardcoded yeşil yapıldı
   locationNotSet: { fontSize: 13, color: '#856404', fontWeight: '500', marginBottom: 8 },
   locationBtn: {
     backgroundColor: Colors.primary, borderRadius: 10,
@@ -351,4 +449,6 @@ const styles = StyleSheet.create({
   saveBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
   cancelBtn: { backgroundColor: Colors.white, borderWidth: 1.5, borderColor: Colors.border },
   cancelBtnText: { color: Colors.textDark, fontSize: 15, fontWeight: '600' },
+  uploadBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.primary, borderRadius: 8 },
+  uploadBtnText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
 });

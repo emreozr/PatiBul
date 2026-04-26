@@ -28,6 +28,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         body: JSON.stringify({ email }),
       });
 
+      // Eğer sunucu hata verip HTML formatında bir sayfa dönerse burası hata fırlatıp catch bloğuna düşer.
       const data = await response.json();
 
       if (!response.ok) {
@@ -46,7 +47,13 @@ const ForgotPasswordScreen = ({ navigation }) => {
         ]
       );
     } catch (error) {
-      Alert.alert('Bağlantı Hatası', 'Lütfen tekrar deneyiniz.');
+      // DÜZELTME BURADA YAPILDI: Gerçek hata konsola yazdırılıyor
+      console.log("-----------------------------------------");
+      console.log("🚨 ŞİFRE SIFIRLAMA HATASI DETAYI 🚨");
+      console.log(error);
+      console.log("-----------------------------------------");
+      
+      Alert.alert('Hata', 'İşlem sırasında bir sorun oluştu. Lütfen Expo terminalini kontrol edin.');
     } finally {
       setLoading(false);
     }
