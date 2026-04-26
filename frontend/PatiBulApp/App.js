@@ -120,6 +120,12 @@ function VetNavigator() {
         component={VetProfileScreen}
         options={{ title: 'Klinik Profilim' }}
       />
+      {/* 🛠 DÜZELTME: Şifre Değiştir ekranı Veteriner navigasyonuna da eklendi */}
+      <Stack.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+        options={{ title: 'Şifre Değiştir' }}
+      />
     </Stack.Navigator>
   );
 }

@@ -58,38 +58,42 @@ export default function ChangePasswordScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const result = await apiFetch('/auth/change-password', {
+      // DÜZELTME: apiFetch yapısına uygun hale getirildi.
+      // Token ve body objesi doğrudan geçiriliyor.
+      const result = await apiFetch('/api/auth/change-password', {
         method: 'PUT',
-        body: JSON.stringify({
+        token: token,
+        body: {
           current_password: currentPassword,
           new_password: newPassword,
           confirm_password: confirmPassword,
-        }),
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
       });
 
-      if (result.data) {
-        Alert.alert('Başarılı', result.data.message, [
-          {
-            text: 'Tamam',
-            onPress: () => {
-              // Alanları temizle
-              setCurrentPassword('');
-              setNewPassword('');
-              setConfirmPassword('');
-              setErrors({});
-              // Kullanıcı profiline dön
-              navigation.goBack();
-            },
+      // API başarılı döndüğünde (200 OK)
+      Alert.alert('Başarılı', 'Şifreniz başarıyla değiştirildi.', [
+        {
+          text: 'Tamam',
+          onPress: () => {
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setErrors({});
+            navigation.goBack();
           },
-        ]);
-      }
+        },
+      ]);
+
     } catch (error) {
-      // Backend hatasını göster
-      const errorMessage = error.data?.error || error.message || 'Şifre değiştirilirken hata oluştu';
+      console.log("Şifre Değiştirme Hatası:", error);
+
+      // Hata mesajını backend'den gelen veriye göre yakala
+      const errorMessage =
+        error.response?.data?.error ||
+        error.data?.error ||
+        error.message ||
+        'Şifre değiştirilirken hata oluştu';
+
       Alert.alert('Hata', errorMessage);
     } finally {
       setLoading(false);
@@ -103,13 +107,14 @@ export default function ChangePasswordScreen({ navigation }) {
         backgroundColor: colors.background,
         paddingHorizontal: 20,
       }}
+      contentContainerStyle={{ paddingBottom: 40 }}
     >
       <View style={{ marginTop: 30 }}>
         <Text
           style={{
             fontSize: 24,
             fontWeight: '700',
-            color: colors.text,
+            color: colors.textDark || '#000',
             marginBottom: 20,
           }}
         >
@@ -170,38 +175,38 @@ export default function ChangePasswordScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Değiştir Butonu */}
-        <CustomButton
-          title={loading ? 'Değiştiriliyor...' : 'Şifreyi Değiştir'}
-          onPress={handleChangePassword}
-          disabled={loading}
-        />
+        {/* Butonlar */}
+        <View style={{ gap: 10 }}>
+          <CustomButton
+            title={loading ? 'İşlem yapılıyor...' : 'Şifreyi Güncelle'}
+            onPress={handleChangePassword}
+            disabled={loading}
+          />
 
-        {/* İptal Butonu */}
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={{
-            paddingVertical: 12,
-            marginTop: 15,
-            marginBottom: 40,
-          }}
-        >
-          <Text
-            style={{
-              color: colors.primary,
-              fontSize: 16,
-              fontWeight: '600',
-              textAlign: 'center',
-            }}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={{ paddingVertical: 12 }}
+            disabled={loading}
           >
-            İptal
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={{
+                color: colors.primary,
+                fontSize: 16,
+                fontWeight: '600',
+                textAlign: 'center',
+              }}
+            >
+              İptal
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {loading && (
-          <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <ActivityIndicator
+            size="large"
+            color={colors.primary}
+            style={{ marginTop: 20 }}
+          />
         )}
       </View>
     </ScrollView>
