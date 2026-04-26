@@ -10,20 +10,26 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image, // EKSİKTİ: Eklendi
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
-import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
+import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES, uploadProfilePhoto } from '../../services/api'; // uploadProfilePhoto eklendi
 import ErrorScreen from '../../components/ErrorScreen';
-import ImagePicker from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker'; // EKSİKTİ: Expo fonksiyonları kullandığın için düzeltildi
+import { config } from '../../config'; // EKSİKTİ: API_URL için eklendi (kendi dosya yoluna göre düzenle)
 
-export default function UserProfileScreen() {
+// EKSİKTİ: navigation prop'u eklendi
+export default function UserProfileScreen({ navigation }) {
   const { token, user: authUser, login } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [loadError, setLoadError] = useState(null);
+
+  // EKSİKTİ: photoUri state'i tanımlandı
+  const [photoUri, setPhotoUri] = useState(null); 
 
   const [profile, setProfile] = useState({ name: '', email: '', phone: '', profile_photo: '' });
   const [form, setForm] = useState({ name: '', email: '', phone: '', profile_photo: '' });
@@ -172,18 +178,18 @@ export default function UserProfileScreen() {
               ) : (
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
-                    {profile.name ? profile.name.charAt(0).toUpperCase() : '?'}
+                    {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
-            {editMode && photoUri !== (profile.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null) && (
+            {editMode && photoUri !== (profile?.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null) && (
               <TouchableOpacity style={styles.uploadBtn} onPress={uploadPhoto} disabled={saving}>
                 <Text style={styles.uploadBtnText}>Fotoğrafı Yükle</Text>
               </TouchableOpacity>
             )}
-            <Text style={styles.nameLabel}>{profile.name}</Text>
-            <Text style={styles.emailLabel}>{profile.email}</Text>
+            <Text style={styles.nameLabel}>{profile?.name}</Text>
+            <Text style={styles.emailLabel}>{profile?.email}</Text>
           </View>
 
           {/* Kart */}
@@ -201,13 +207,13 @@ export default function UserProfileScreen() {
                   placeholderTextColor={Colors.textLight}
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.name || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.name || '—'}</Text>
               )}
             </View>
 
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>E-posta</Text>
-              <Text style={styles.fieldValue}>{profile.email || '—'}</Text>
+              <Text style={styles.fieldValue}>{profile?.email || '—'}</Text>
               {editMode && <Text style={styles.fieldHint}>E-posta değiştirilemez</Text>}
             </View>
 
@@ -223,21 +229,24 @@ export default function UserProfileScreen() {
                   keyboardType="phone-pad"
                 />
               ) : (
-                <Text style={styles.fieldValue}>{profile.phone || '—'}</Text>
+                <Text style={styles.fieldValue}>{profile?.phone || '—'}</Text>
               )}
             </View>
 
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Profil Fotoğrafı</Text>
-              {profile.profile_photo ? (
+              
+              {/* EKSİKTİ: Image URL kullanımı güvenli hale getirildi */}
+              {profile?.profile_photo ? (
                 <View style={styles.imageContainer}>
-                  <Image source={profile.profile_photo} style={styles.image} />
+                  <Image source={{ uri: `${config.API_URL}/${profile.profile_photo}` }} style={styles.image} />
                 </View>
               ) : (
                 <View style={styles.imageContainer}>
-                  <Text style={styles.imagePlaceholder}>Fotoğraf yükleniyor...</Text>
+                  <Text style={styles.imagePlaceholder}>Fotoğraf bulunmuyor</Text>
                 </View>
               )}
+
               {editMode && (
                 <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
                   <Text style={styles.imagePickerBtnText}>Galeriden Seç</Text>
@@ -286,7 +295,8 @@ export default function UserProfileScreen() {
               borderBottomColor: '#ECECEC',
             }}
           >
-            <Text style={{ fontSize: 16, color: colors.text, flex: 1 }}>🔐 Şifre Değiştir</Text>
+            {/* EKSİKTİ: colors.text hatalıydı, Colors.textDark olarak düzeltildi */}
+            <Text style={{ fontSize: 16, color: Colors.textDark, flex: 1 }}>🔐 Şifre Değiştir</Text>
             <Text style={{ fontSize: 16, color: '#CCC' }}>›</Text>
           </TouchableOpacity>
 
@@ -336,8 +346,8 @@ const styles = StyleSheet.create({
   imageContainer: { alignItems: 'center', justifyContent: 'center', marginVertical: 10 },
   image: { width: 100, height: 100, borderRadius: 50 },
   imagePlaceholder: { fontSize: 16, color: Colors.textLight },
-  imagePickerBtn: { backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 10 },
-  imagePickerBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  imagePickerBtn: { backgroundColor: Colors.primary, borderRadius: 10, paddingVertical: 10, marginBottom: 5 },
+  imagePickerBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   uploadBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 16, backgroundColor: Colors.primary, borderRadius: 8 },
   uploadBtnText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
 });
