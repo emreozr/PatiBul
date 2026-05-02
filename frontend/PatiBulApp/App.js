@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import Colors from './src/styles/colors';
@@ -11,6 +10,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
+import SplashScreen from './src/screens/SplashScreen';
 
 // User Screens
 import UserHomeScreen from './src/screens/user/UserHomeScreen';
@@ -120,7 +120,6 @@ function VetNavigator() {
         component={VetProfileScreen}
         options={{ title: 'Klinik Profilim' }}
       />
-      {/* 🛠 DÜZELTME: Şifre Değiştir ekranı Veteriner navigasyonuna da eklendi */}
       <Stack.Screen
         name="ChangePassword"
         component={ChangePasswordScreen}
@@ -133,12 +132,9 @@ function VetNavigator() {
 function AppNavigator() {
   const { token, user, loading } = useAuth();
 
+  // loading true iken splash screen göster
   if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   if (!token) return <AuthNavigator />;

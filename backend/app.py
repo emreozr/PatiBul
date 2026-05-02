@@ -35,6 +35,11 @@ def create_app():
     def uploaded_file(filename):
         upload_folder = os.path.join(app.root_path, "uploads")
         return send_from_directory(upload_folder, filename)
+    
+    @app.after_request
+    def log_response(response):
+        print(f"STATUS: {response.status}")
+        return response
 
     with app.app_context():
         db.create_all()

@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   ScrollView,
+  Image as RNImage,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -15,9 +16,7 @@ import Colors from '../../styles/colors';
 import useApi from '../../hooks/useApi';
 import ErrorScreen from '../../components/ErrorScreen';
 import { ErrorBanner } from '../../components/ErrorScreen';
-import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { uploadProfilePhoto } from '../../services/api';
 import config from '../../config';
 
 const typeConfig = {
@@ -37,38 +36,47 @@ const ReportCard = ({ item, onPress }) => {
   const status = statusConfig[item.status] || statusConfig.beklemede;
   const isCreatedRecently = (new Date() - new Date(item.created_at)) < 24 * 60 * 60 * 1000;
   const isNew = item.status === 'beklemede' && isCreatedRecently;
+  const firstImage = item.images && item.images.length > 0 ? item.images[0] : null;
 
   return (
     <TouchableOpacity
-      style={[
-        styles.reportCard,
-        isNew && { borderColor: '#FF9500', borderWidth: 1 }
-      ]}
+      style={[styles.reportCard, isNew && { borderColor: '#FF9500', borderWidth: 1 }]}
       onPress={() => onPress(item)}
     >
-      <View style={styles.reportCardHeader}>
-        <View style={[styles.typeBadge, { backgroundColor: type.color + '22' }]}>
-          <Text style={styles.typeBadgeIcon}>{type.icon}</Text>
-          <Text style={[styles.typeBadgeText, { color: type.color }]}>{type.label}</Text>
-        </View>
-        <View style={styles.rightBadgesContainer}>
-          {isNew && (
-            <View style={styles.newBadgeInline}>
-              <Text style={styles.newBadgeInlineText}>YENİ</Text>
+      {/* Fotoğraf */}
+      {firstImage && (
+        <RNImage
+          source={{ uri: `${config.API_URL}${firstImage.image_url}` }}
+          style={styles.cardImage}
+          resizeMode="cover"
+        />
+      )}
+
+      <View style={styles.cardContent}>
+        <View style={styles.reportCardHeader}>
+          <View style={[styles.typeBadge, { backgroundColor: type.color + '22' }]}>
+            <Text style={styles.typeBadgeIcon}>{type.icon}</Text>
+            <Text style={[styles.typeBadgeText, { color: type.color }]}>{type.label}</Text>
+          </View>
+          <View style={styles.rightBadgesContainer}>
+            {isNew && (
+              <View style={styles.newBadgeInline}>
+                <Text style={styles.newBadgeInlineText}>YENİ</Text>
+              </View>
+            )}
+            <View style={[styles.statusBadge, { backgroundColor: status.color + '22' }]}>
+              <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
             </View>
-          )}
-          <View style={[styles.statusBadge, { backgroundColor: status.color + '22' }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
           </View>
         </View>
+        <Text style={styles.reportAnimal}>{item.animal_type}</Text>
+        <Text style={styles.reportDesc} numberOfLines={2}>{item.description}</Text>
+        <View style={styles.reportFooter}>
+          <Text style={styles.reportLocation}>📍 {item.location_desc || 'Konum belirtilmedi'}</Text>
+          <Text style={styles.reportTime}>{new Date(item.created_at).toLocaleDateString('tr-TR')}</Text>
+        </View>
+        <Text style={styles.reportUser}>Gönderen: {item.user_name}</Text>
       </View>
-      <Text style={styles.reportAnimal}>{item.animal_type}</Text>
-      <Text style={styles.reportDesc} numberOfLines={2}>{item.description}</Text>
-      <View style={styles.reportFooter}>
-        <Text style={styles.reportLocation}>📍 {item.location_desc || 'Konum belirtilmedi'}</Text>
-        <Text style={styles.reportTime}>{new Date(item.created_at).toLocaleDateString('tr-TR')}</Text>
-      </View>
-      <Text style={styles.reportUser}>Gönderen: {item.user_name}</Text>
     </TouchableOpacity>
   );
 };
@@ -78,7 +86,7 @@ const VetHomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('beklemede');
   const [allReports, setAllReports] = useState([]);
 
-  const { loading, error, execute, retry } = useApi();
+  const { loading, error, execute } = useApi();
 
   const fetchReports = useCallback(async () => {
     const result = await execute('/api/reports/', { token });
@@ -102,7 +110,7 @@ const VetHomeScreen = ({ navigation }) => {
     { key: 'tumu', label: 'Toplam', value: allReports.length, color: '#fff' },
     { key: 'beklemede', label: 'Bekleyen', value: allReports.filter(r => r.status === 'beklemede').length, color: '#FF9500' },
     { key: 'inceleniyor', label: 'İncelenen', value: allReports.filter(r => r.status === 'inceleniyor').length, color: '#007AFF' },
-    { key: 'tamamlandi', label: 'Tamamlanan', value: allReports.filter(r => r.status === 'tamamlandi').length, color: '#34C759' },
+    { key: 'tamamlandi', label: 'Bitti', value: allReports.filter(r => r.status === 'tamamlandi').length, color: '#34C759' },
   ];
 
   const filteredReports = activeTab === 'tumu'
@@ -145,7 +153,10 @@ const VetHomeScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('VetProfile')}
         >
           {user?.profile_photo ? (
-            <Image source={{ uri: `${config.API_URL}/${user.profile_photo}` }} style={styles.avatarImage} />
+            <Image
+              source={{ uri: `${config.API_URL}/${user.profile_photo}` }}
+              style={styles.avatarImage}
+            />
           ) : (
             <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
           )}
@@ -159,7 +170,11 @@ const VetHomeScreen = ({ navigation }) => {
             key={s.label}
             style={[
               styles.statBox,
-              activeTab === s.key && { backgroundColor: 'rgba(255,255,255,0.3)', borderWidth: 1, borderColor: s.color }
+              activeTab === s.key && {
+                backgroundColor: 'rgba(255,255,255,0.3)',
+                borderWidth: 1,
+                borderColor: s.color,
+              },
             ]}
             onPress={() => setActiveTab(s.key)}
             activeOpacity={0.7}
@@ -251,29 +266,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  placeholderBadgeContainer: {
-    position: 'relative',
-    marginRight: 16,
-    padding: 4,
-  },
-  placeholderBadgeIcon: {
-    fontSize: 24,
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 10,
-    height: 10,
-    backgroundColor: '#FF3B30',
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
   avatarContainer: {
     width: 44,
     height: 44,
@@ -304,7 +296,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
   },
   statNumber: {
@@ -315,6 +307,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
@@ -361,13 +354,20 @@ const styles = StyleSheet.create({
   reportCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
-    padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: 160,
+  },
+  cardContent: {
+    padding: 16,
   },
   newBadgeInline: {
     backgroundColor: '#FF9500',
@@ -468,18 +468,6 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontWeight: '600',
     fontSize: 15,
-  },
-  uploadBtn: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-  },
-  uploadBtnText: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
 

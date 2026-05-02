@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
       try {
         const storedToken = await AsyncStorage.getItem('userToken');
         const storedUser = await AsyncStorage.getItem('userData');
-        
+
         if (storedToken && storedUser) {
           setToken(storedToken);
           setUser(JSON.parse(storedUser));
@@ -21,6 +21,8 @@ export function AuthProvider({ children }) {
       } catch (error) {
         console.error('AsyncStorage yükleme hatası:', error);
       } finally {
+        // Minimum 2 saniye splash screen göster
+        await new Promise(resolve => setTimeout(resolve, 2000));
         setLoading(false);
       }
     };
