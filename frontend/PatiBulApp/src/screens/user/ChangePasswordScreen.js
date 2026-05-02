@@ -89,7 +89,6 @@ export default function ChangePasswordScreen({ navigation }) {
 
       // Hata mesajını backend'den gelen veriye göre yakala
       const errorMessage =
-        error.response?.data?.error ||
         error.data?.error ||
         error.message ||
         'Şifre değiştirilirken hata oluştu';
