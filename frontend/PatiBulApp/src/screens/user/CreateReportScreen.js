@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -12,8 +11,13 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import KeyboardSafeView from '../../components/KeyboardSafeView';
+import MapPickerModal from '../../components/MapPickerModal';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
+import config from '../../config';
+
+const API_URL = config.API_URL;
 
 const typeConfig = {
   kayip: { label: 'Kayıp İlanı', icon: '🚨', color: '#FF6B6B' },
@@ -24,77 +28,72 @@ const typeConfig = {
 const animalTypes = ['Kedi', 'Köpek', 'Kuş', 'Tavşan', 'Diğer'];
 
 const CreateReportScreen = ({ route, navigation }) => {
-  const { type = 'kayip' } = route?.params || {};
+  const { type = 'kayip', fromReport, report } = route?.params || {};
   const { token } = useAuth();
 
-  const [animalType, setAnimalType] = useState('');
-  const [description, setDescription] = useState('');
-  const [locationDesc, setLocationDesc] = useState('');
+  const isEdit = !!report;
+
+  // Düzenleme modunda mevcut verilerle doldur
+  const [animalType, setAnimalType] = useState(report?.animal_type || '');
+  const [description, setDescription] = useState(report?.description || '');
+  const [locationDesc, setLocationDesc] = useState(report?.location_desc || '');
   const [image, setImage] = useState(null);
-  const [location, setLocation] = useState(null);
+  const [location, setLocation] = useState(
+    report?.latitude ? { latitude: report.latitude, longitude: report.longitude } : null
+  );
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
 
-  const config_type = typeConfig[type];
+  const currentType = fromReport ? 'bulunan' : (report?.report_type || type);
+  const config_type = typeConfig[currentType] || typeConfig.kayip;
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Fotoğraf seçmek için galeri iznine ihtiyaç var.');
+      Alert.alert('İzin Gerekli', 'Galeri iznine ihtiyaç var.');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
     });
-
-    if (!result.canceled) {
-      setImage(result.assets[0]);
-    }
+    if (!result.canceled) setImage(result.assets[0]);
   };
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Fotoğraf çekmek için kamera iznine ihtiyaç var.');
+      Alert.alert('İzin Gerekli', 'Kamera iznine ihtiyaç var.');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
     });
-
-    if (!result.canceled) {
-      setImage(result.assets[0]);
-    }
+    if (!result.canceled) setImage(result.assets[0]);
   };
 
-  const getLocation = async () => {
+  const getCurrentLocation = async () => {
     setLocationLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('İzin Gerekli', 'Konum eklemek için konum iznine ihtiyaç var.');
+        Alert.alert('İzin Gerekli', 'Konum iznine ihtiyaç var.');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
       setLocation(loc.coords);
-
-      // Adres bilgisini al
       const address = await Location.reverseGeocodeAsync({
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
       });
-
       if (address.length > 0) {
         const addr = address[0];
-        const addressStr = [addr.district, addr.city].filter(Boolean).join(', ');
-        setLocationDesc(addressStr);
+        setLocationDesc([addr.district, addr.city].filter(Boolean).join(', '));
       }
     } catch (e) {
       Alert.alert('Hata', 'Konum alınamadı.');
@@ -103,32 +102,139 @@ const CreateReportScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleMapConfirm = async (coords) => {
+    setLocation(coords);
+    try {
+      const address = await Location.reverseGeocodeAsync({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+      if (address.length > 0) {
+        const addr = address[0];
+        setLocationDesc([addr.district, addr.city].filter(Boolean).join(', '));
+      }
+    } catch (e) {}
+  };
+
+  // Buldum akışı
+  const handleFoundSubmit = async () => {
     if (!animalType || !description) {
       Alert.alert('Hata', 'Lütfen hayvan türü ve açıklama alanlarını doldurun.');
       return;
     }
-
     setLoading(true);
     try {
-      // 1. Bildirimi oluştur
-      const { data } = await apiFetch('/api/reports/', {
+      const autoMessage = [
+        `Merhaba! "${fromReport.animal_type}" ilanınızı gördüm.`,
+        ``,
+        `📋 Hayvan Bilgileri:`,
+        `🐾 Hayvan Türü: ${animalType}`,
+        `📝 Not: ${description}`,
+        locationDesc ? `📍 Konum: ${locationDesc}` : null,
+        ``,
+        `Benimle iletişime geçer misiniz?`,
+      ].filter(line => line !== null).join('\n');
+
+      const response = await fetch(`${API_URL}/api/messages/`, {
         method: 'POST',
-        token,
-        body: {
-          report_type: type,
-          animal_type: animalType,
-          description,
-          location_desc: locationDesc,
-          latitude: location?.latitude,
-          longitude: location?.longitude,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          receiver_id: fromReport.user_id,
+          content: autoMessage,
+          report_id: fromReport.id,
+        }),
       });
 
-      const reportId = data.report.id;
+      const data = await response.json();
+      if (!response.ok) {
+        Alert.alert('Hata', data.error || 'Mesaj gönderilemedi.');
+        return;
+      }
 
-      // 2. Fotoğraf varsa yükle
       if (image) {
+        const messageId = data.data.id;
+        const formData = new FormData();
+        const ext = image.uri.split('.').pop();
+        formData.append('image', {
+          uri: image.uri,
+          name: `msg_${Date.now()}.${ext}`,
+          type: `image/${ext}`,
+        });
+        await fetch(`${API_URL}/api/messages/${messageId}/upload-image`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+      }
+
+      Alert.alert(
+        '🎉 Mesaj Gönderildi!',
+        'İlan sahibine bilgi verildi. Mesajlaşma ekranına yönlendiriliyorsunuz.',
+        [{
+          text: 'Tamam',
+          onPress: () => {
+            navigation.reset({
+              index: 1,
+              routes: [
+                { name: 'UserHome' },
+                {
+                  name: 'Conversation',
+                  params: {
+                    otherUserId: fromReport.user_id,
+                    otherUserName: fromReport.user_name,
+                    otherUserPhoto: fromReport.user_photo,
+                    reportId: fromReport.id,
+                    reportAnimal: fromReport.animal_type,
+                  },
+                },
+              ],
+            });
+          },
+        }],
+      );
+    } catch (e) {
+      Alert.alert('Bağlantı Hatası', 'Sunucuya ulaşılamıyor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Normal ilan oluşturma veya düzenleme
+  const handleNormalSubmit = async () => {
+    if (!animalType || !description) {
+      Alert.alert('Hata', 'Lütfen hayvan türü ve açıklama alanlarını doldurun.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const endpoint = isEdit ? `/api/reports/${report.id}` : '/api/reports/';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const body = isEdit
+        ? {
+            animal_type: animalType,
+            description,
+            location_desc: locationDesc,
+            latitude: location?.latitude,
+            longitude: location?.longitude,
+          }
+        : {
+            report_type: type,
+            animal_type: animalType,
+            description,
+            location_desc: locationDesc,
+            latitude: location?.latitude,
+            longitude: location?.longitude,
+          };
+
+      const { data } = await apiFetch(endpoint, { method, token, body });
+
+      const reportId = isEdit ? report.id : data.report.id;
+
+      if (image && !isEdit) {
         const formData = new FormData();
         const ext = image.uri.split('.').pop();
         formData.append('image', {
@@ -136,7 +242,6 @@ const CreateReportScreen = ({ route, navigation }) => {
           name: `photo.${ext}`,
           type: `image/${ext}`,
         });
-
         await apiFetch(`/api/reports/${reportId}/upload-image`, {
           method: 'POST',
           token,
@@ -146,9 +251,11 @@ const CreateReportScreen = ({ route, navigation }) => {
         });
       }
 
-      Alert.alert('Başarılı', 'Bildiriminiz oluşturuldu!', [
-        { text: 'Tamam', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert(
+        'Başarılı',
+        isEdit ? 'İlanınız güncellendi!' : 'Bildiriminiz oluşturuldu!',
+        [{ text: 'Tamam', onPress: () => navigation.goBack() }],
+      );
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.type === ERROR_TYPES.CLIENT) {
@@ -165,13 +272,41 @@ const CreateReportScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleSubmit = fromReport ? handleFoundSubmit : handleNormalSubmit;
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <KeyboardSafeView contentStyle={styles.content}>
+
+      {/* Buldum bandı */}
+      {fromReport && (
+        <View style={styles.foundBanner}>
+          <Text style={styles.foundBannerText}>
+            🐾 "{fromReport.animal_type}" ilanı sahibine mesaj gönderiyorsunuz
+          </Text>
+          <Text style={styles.foundBannerSub}>
+            İlan oluşturulmayacak, sadece ilan sahibine bilgi gidecek
+          </Text>
+        </View>
+      )}
+
+      {/* Düzenleme bandı */}
+      {isEdit && (
+        <View style={styles.editBanner}>
+          <Text style={styles.editBannerText}>
+            ✏️ İlanı düzenliyorsunuz
+          </Text>
+        </View>
+      )}
 
       {/* Tip Banner */}
-      <View style={[styles.typeBanner, { backgroundColor: config_type.color + '22', borderColor: config_type.color }]}>
+      <View style={[
+        styles.typeBanner,
+        { backgroundColor: config_type.color + '22', borderColor: config_type.color },
+      ]}>
         <Text style={styles.typeBannerIcon}>{config_type.icon}</Text>
-        <Text style={[styles.typeBannerText, { color: config_type.color }]}>{config_type.label}</Text>
+        <Text style={[styles.typeBannerText, { color: config_type.color }]}>
+          {fromReport ? 'Buldum Bildirimi' : config_type.label}
+        </Text>
       </View>
 
       {/* Hayvan Türü */}
@@ -183,7 +318,10 @@ const CreateReportScreen = ({ route, navigation }) => {
             style={[styles.animalTypeBtn, animalType === a && styles.animalTypeBtnActive]}
             onPress={() => setAnimalType(a)}
           >
-            <Text style={[styles.animalTypeBtnText, animalType === a && styles.animalTypeBtnTextActive]}>
+            <Text style={[
+              styles.animalTypeBtnText,
+              animalType === a && styles.animalTypeBtnTextActive,
+            ]}>
               {a}
             </Text>
           </TouchableOpacity>
@@ -191,10 +329,16 @@ const CreateReportScreen = ({ route, navigation }) => {
       </View>
 
       {/* Açıklama */}
-      <Text style={styles.sectionLabel}>Açıklama *</Text>
+      <Text style={styles.sectionLabel}>
+        {fromReport ? 'Not (ilan sahibine iletilecek) *' : 'Açıklama *'}
+      </Text>
       <TextInput
         style={styles.textArea}
-        placeholder="Hayvanı tanımlayın (renk, irk, ayırt edici özellikler...)"
+        placeholder={
+          fromReport
+            ? 'Hayvanı nerede gördünüz, nasıl tanıdınız, iletişim bilgileriniz...'
+            : 'Hayvanı tanımlayın (renk, irk, ayırt edici özellikler...)'
+        }
         placeholderTextColor="#aaa"
         value={description}
         onChangeText={setDescription}
@@ -205,19 +349,33 @@ const CreateReportScreen = ({ route, navigation }) => {
 
       {/* Konum */}
       <Text style={styles.sectionLabel}>Konum</Text>
-      <TouchableOpacity
-        style={styles.locationBtn}
-        onPress={getLocation}
-        disabled={locationLoading}
-      >
-        {locationLoading ? (
-          <ActivityIndicator size="small" color="#4CAF50" />
-        ) : (
-          <Text style={styles.locationBtnText}>
-            {location ? '✅ Konum Alındı' : '📍 Konumumu Kullan'}
-          </Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.locationRow}>
+        <TouchableOpacity
+          style={[styles.locationBtn, styles.locationBtnLeft]}
+          onPress={getCurrentLocation}
+          disabled={locationLoading}
+        >
+          {locationLoading ? (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          ) : (
+            <Text style={styles.locationBtnText}>
+              {location ? '✅ Alındı' : '📍 Konumum'}
+            </Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.locationBtn, styles.locationBtnRight]}
+          onPress={() => setMapPickerVisible(true)}
+        >
+          <Text style={styles.locationBtnText}>🗺️ Haritadan Seç</Text>
+        </TouchableOpacity>
+      </View>
+
+      {location && (
+        <Text style={styles.locationSetText}>
+          ✅ Konum ayarlandı ({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})
+        </Text>
+      )}
 
       <TextInput
         style={styles.input}
@@ -257,20 +415,66 @@ const CreateReportScreen = ({ route, navigation }) => {
           style={[styles.submitBtn, { backgroundColor: config_type.color }]}
           onPress={handleSubmit}
         >
-          <Text style={styles.submitBtnText}>Bildirimi Gönder</Text>
+          <Text style={styles.submitBtnText}>
+            {fromReport
+              ? '📤 İlan Sahibine Bildir ve Mesajlaş'
+              : isEdit
+              ? '✅ Değişiklikleri Kaydet'
+              : 'Bildirimi Gönder'}
+          </Text>
         </TouchableOpacity>
       )}
 
-      <View style={styles.bottomSpace} />
-    </ScrollView>
+      {/* Harita Modal */}
+      <MapPickerModal
+        visible={mapPickerVisible}
+        onClose={() => setMapPickerVisible(false)}
+        onConfirm={handleMapConfirm}
+        initialCoords={location}
+      />
+
+    </KeyboardSafeView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
+  content: {
     padding: 20,
+  },
+  foundBanner: {
+    backgroundColor: '#4ECDC411',
+    borderWidth: 1.5,
+    borderColor: '#4ECDC4',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  foundBannerText: {
+    fontSize: 13,
+    color: '#4ECDC4',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  foundBannerSub: {
+    fontSize: 11,
+    color: '#4ECDC4',
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  editBanner: {
+    backgroundColor: '#FFF3CD',
+    borderWidth: 1.5,
+    borderColor: '#FFE69C',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  editBannerText: {
+    fontSize: 13,
+    color: '#856404',
+    fontWeight: '600',
   },
   typeBanner: {
     flexDirection: 'row',
@@ -332,19 +536,33 @@ const styles = StyleSheet.create({
     minHeight: 100,
     marginBottom: 20,
   },
+  locationRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
   locationBtn: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#4CAF50',
     padding: 12,
     alignItems: 'center',
-    marginBottom: 10,
   },
+  locationBtnLeft: {},
+  locationBtnRight: {},
   locationBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#4CAF50',
     fontWeight: '600',
+  },
+  locationSetText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4,
   },
   input: {
     backgroundColor: '#fff',
@@ -409,9 +627,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  bottomSpace: {
-    height: 40,
   },
 });
 

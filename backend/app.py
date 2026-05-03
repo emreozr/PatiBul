@@ -5,7 +5,6 @@ from flask_bcrypt import Bcrypt
 from config import Config
 from models import db
 from flask_mail import Mail
-# Message ve diğerlerini burada kullanmıyorsan silebilirsin, kalabalık yapmasın
 
 # Objeleri globalde tanımlıyoruz
 mail = Mail()
@@ -26,12 +25,14 @@ def create_app():
     from routes.auth import auth_bp
     from routes.user import user_bp
     from routes.reports import reports_bp
+    from routes.messages import messages_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(user_bp, url_prefix="/api/user")
     app.register_blueprint(reports_bp, url_prefix="/api/reports")
+    app.register_blueprint(messages_bp, url_prefix="/api/messages")
 
-    @app.route("/uploads/<filename>")
+    @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
         upload_folder = os.path.join(app.root_path, "uploads")
         return send_from_directory(upload_folder, filename)

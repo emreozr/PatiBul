@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../../services/api';
 import ErrorScreen from '../../components/ErrorScreen';
+import MapPickerModal from '../../components/MapPickerModal';
 import config from '../../config';
 
 export default function VetProfileScreen({ navigation }) {
@@ -29,6 +30,7 @@ export default function VetProfileScreen({ navigation }) {
   const [locationLoading, setLocationLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [phoneError, setPhoneError] = useState('');
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
 
   const [photoUri, setPhotoUri] = useState(null);
   const [profile, setProfile] = useState({
@@ -107,15 +109,11 @@ export default function VetProfileScreen({ navigation }) {
   };
 
   const showImageOptions = () => {
-    Alert.alert(
-      'Profil Fotoğrafı Seç',
-      'Nereden yüklemek istersiniz?',
-      [
-        { text: 'Kamera', onPress: takePhoto },
-        { text: 'Galeri', onPress: pickImage },
-        { text: 'İptal', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Profil Fotoğrafı Seç', '', [
+      { text: 'Kamera', onPress: takePhoto },
+      { text: 'Galeri', onPress: pickImage },
+      { text: 'İptal', style: 'cancel' },
+    ]);
   };
 
   const uploadPhoto = async () => {
@@ -137,10 +135,7 @@ export default function VetProfileScreen({ navigation }) {
       const response = await fetch(`${config.API_URL}/api/user/profile/photo`, {
         method: 'POST',
         body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       });
       const data = await response.json();
       if (response.ok) {
@@ -170,7 +165,7 @@ export default function VetProfileScreen({ navigation }) {
     }
   };
 
-  const handleGetLocation = async () => {
+  const handleGetCurrentLocation = async () => {
     setLocationLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -188,6 +183,11 @@ export default function VetProfileScreen({ navigation }) {
     } finally {
       setLocationLoading(false);
     }
+  };
+
+  const handleMapConfirm = (coords) => {
+    setForm({ ...form, latitude: coords.latitude, longitude: coords.longitude });
+    Alert.alert('Başarılı', 'Konum seçildi. Kaydetmeyi unutma!');
   };
 
   const handleSave = async () => {
@@ -380,32 +380,41 @@ export default function VetProfileScreen({ navigation }) {
               )}
             </View>
 
+            {/* Konum */}
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Klinik Konumu (Harita için)</Text>
-              {profile?.latitude && profile?.longitude ? (
+              {form.latitude && form.longitude ? (
                 <Text style={styles.locationSet}>
-                  ✅ Konum ayarlandı ({profile.latitude.toFixed(4)}, {profile.longitude.toFixed(4)})
+                  ✅ Konum ayarlandı ({(form.latitude || profile.latitude)?.toFixed(4)}, {(form.longitude || profile.longitude)?.toFixed(4)})
                 </Text>
               ) : (
                 <Text style={styles.locationNotSet}>⚠️ Konum henüz ayarlanmadı</Text>
               )}
               {editMode && (
-                <TouchableOpacity
-                  style={styles.locationBtn}
-                  onPress={handleGetLocation}
-                  disabled={locationLoading}
-                >
-                  {locationLoading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.locationBtnText}>📍 Mevcut Konumu Al</Text>
-                  )}
-                </TouchableOpacity>
+                <View style={styles.locationRow}>
+                  <TouchableOpacity
+                    style={[styles.locationBtn, { flex: 1 }]}
+                    onPress={handleGetCurrentLocation}
+                    disabled={locationLoading}
+                  >
+                    {locationLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.locationBtnText}>📍 Konumumu Al</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.locationBtn, styles.locationBtnMap, { flex: 1 }]}
+                    onPress={() => setMapPickerVisible(true)}
+                  >
+                    <Text style={styles.locationBtnText}>🗺️ Haritadan Seç</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           </View>
 
-          {/* Kaydet / Düzenle Butonları */}
+          {/* Butonlar */}
           <View style={{ gap: 12 }}>
             {editMode ? (
               <View style={styles.buttonRow}>
@@ -437,7 +446,6 @@ export default function VetProfileScreen({ navigation }) {
               </TouchableOpacity>
             )}
 
-            {/* Şifre Değiştir Butonu */}
             <TouchableOpacity
               style={styles.changePasswordBtn}
               onPress={() => navigation.navigate('ChangePassword')}
@@ -445,9 +453,20 @@ export default function VetProfileScreen({ navigation }) {
               <Text style={styles.changePasswordBtnText}>Şifre Değiştir</Text>
             </TouchableOpacity>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Harita Modal */}
+      <MapPickerModal
+        visible={mapPickerVisible}
+        onClose={() => setMapPickerVisible(false)}
+        onConfirm={handleMapConfirm}
+        initialCoords={
+          form.latitude
+            ? { latitude: form.latitude, longitude: form.longitude }
+            : null
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -588,16 +607,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 8,
   },
+  locationRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   locationBtn: {
     backgroundColor: '#1a1a2e',
     borderRadius: 10,
     padding: 12,
     alignItems: 'center',
   },
+  locationBtnMap: {
+    backgroundColor: '#4CAF50',
+  },
   locationBtnText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   buttonRow: {
     flexDirection: 'row',

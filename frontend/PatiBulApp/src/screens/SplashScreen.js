@@ -4,10 +4,7 @@ import {
   Text,
   StyleSheet,
   Animated,
-  Dimensions,
 } from 'react-native';
-
-const { width } = Dimensions.get('window');
 
 const SplashScreen = () => {
   const logoScale = useRef(new Animated.Value(0)).current;
