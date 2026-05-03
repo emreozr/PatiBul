@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+
 class User(db.Model):
     __tablename__ = "users"
 
@@ -39,6 +40,7 @@ class User(db.Model):
             "profile_photo": self.profile_photo,
         }
 
+
 class PetReport(db.Model):
     __tablename__ = "pet_reports"
 
@@ -73,6 +75,7 @@ class PetReport(db.Model):
             "created_at": self.created_at.isoformat()
         }
 
+
 class ReportImage(db.Model):
     __tablename__ = "report_images"
 
@@ -88,6 +91,7 @@ class ReportImage(db.Model):
             "image_url": self.image_url,
             "uploaded_at": self.uploaded_at.isoformat()
         }
+
 
 class VetResponse(db.Model):
     __tablename__ = "vet_responses"
@@ -110,6 +114,40 @@ class VetResponse(db.Model):
             "message": self.message,
             "created_at": self.created_at.isoformat()
         }
+
+
+class Message(db.Model):
+    __tablename__ = "messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    report_id = db.Column(db.Integer, db.ForeignKey("pet_reports.id"), nullable=True)
+    content = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    sender = db.relationship("User", foreign_keys=[sender_id])
+    receiver = db.relationship("User", foreign_keys=[receiver_id])
+    report = db.relationship("PetReport", foreign_keys=[report_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "sender_id": self.sender_id,
+            "sender_name": self.sender.name if self.sender else None,
+            "sender_photo": self.sender.profile_photo if self.sender else None,
+            "receiver_id": self.receiver_id,
+            "receiver_name": self.receiver.name if self.receiver else None,
+            "report_id": self.report_id,
+            "report_animal": self.report.animal_type if self.report else None,
+            "content": self.content,
+            "image_url": self.image_url,
+            "is_read": self.is_read,
+            "created_at": self.created_at.isoformat()
+        }
+
 
 class PasswordResetToken(db.Model):
     __tablename__ = "password_reset_tokens"

@@ -29,6 +29,10 @@ import VetProfileScreen from './src/screens/vet/VetProfileScreen';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
+import InboxScreen from './src/screens/user/InboxScreen';
+import ConversationScreen from './src/screens/user/ConversationScreen';
+import FoundAnimalsScreen from './src/screens/user/FoundAnimalsScreen';
+
 const Stack = createStackNavigator();
 
 function AuthNavigator() {
@@ -88,10 +92,35 @@ function UserNavigator() {
         options={{ title: 'İlan Detayı' }}
       />
       <Stack.Screen
+        name="EditReport"
+        component={CreateReportScreen}
+        options={{ title: 'İlanı Düzenle' }}
+      />
+      <Stack.Screen
         name="ChangePassword"
         component={ChangePasswordScreen}
         options={{ title: 'Şifre Değiştir' }}
       />
+      <Stack.Screen
+        name="Inbox" 
+        component={InboxScreen} 
+        options={{ title: 'Mesajlarım' }}
+      />
+      <Stack.Screen
+        name="Conversation"
+        component={ConversationScreen}
+        options={{
+          title: '',
+          headerStyle: { backgroundColor: '#4CAF50' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
+      }}
+      />
+       <Stack.Screen
+        name="FoundAnimals"
+        component={FoundAnimalsScreen}
+        options={{ title: 'Bulunan Hayvanlar' }}
+       />
     </Stack.Navigator>
   );
 }

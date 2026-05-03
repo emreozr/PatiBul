@@ -23,6 +23,7 @@ export default function UserProfileScreen({ navigation }) {
   const { token, user: authUser, login } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
   const [photoUri, setPhotoUri] = useState(null);
@@ -62,9 +63,13 @@ export default function UserProfileScreen({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true, aspect: [1, 1], quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
     });
-    if (!result.canceled) setPhotoUri(result.assets[0].uri);
+    if (!result.canceled) {
+      uploadPhoto(result.assets[0].uri);
+    }
   };
 
   const pickImage = async () => {
@@ -75,31 +80,32 @@ export default function UserProfileScreen({ navigation }) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, aspect: [1, 1], quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
     });
-    if (!result.canceled) setPhotoUri(result.assets[0].uri);
+    if (!result.canceled) {
+      uploadPhoto(result.assets[0].uri);
+    }
   };
 
   const showImageOptions = () => {
-    Alert.alert('Profil Fotoğrafı Seç', 'Nereden yüklemek istersiniz?', [
+    Alert.alert('Profil Fotoğrafı', 'Nereden yüklemek istersiniz?', [
       { text: 'Kamera', onPress: takePhoto },
       { text: 'Galeri', onPress: pickImage },
       { text: 'İptal', style: 'cancel' },
     ]);
   };
 
-  const uploadPhoto = async () => {
-    if (!photoUri || photoUri.startsWith('http')) {
-      Alert.alert('Uyarı', 'Lütfen önce yeni bir fotoğraf seçin.');
-      return;
-    }
-    setSaving(true);
+  const uploadPhoto = async (uri) => {
+    setUploadingPhoto(true);
+    setPhotoUri(uri);
     const formData = new FormData();
-    const uriParts = photoUri.split('.');
+    const uriParts = uri.split('.');
     const fileType = uriParts[uriParts.length - 1].toLowerCase();
     const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg';
     formData.append('photo', {
-      uri: Platform.OS === 'android' ? photoUri : photoUri.replace('file://', ''),
+      uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
       name: `profile_${Date.now()}.${fileType}`,
       type: mimeType,
     });
@@ -111,18 +117,19 @@ export default function UserProfileScreen({ navigation }) {
       });
       const data = await response.json();
       if (response.ok) {
-        Alert.alert('Başarılı', 'Profil fotoğrafınız güncellendi.');
         login(token, { ...authUser, profile_photo: data.photo_url });
-        setProfile({ ...profile, profile_photo: data.photo_url });
+        setProfile(prev => ({ ...prev, profile_photo: data.photo_url }));
         setPhotoUri(`${config.API_URL}/${data.photo_url}`);
-        setEditMode(false);
+        Alert.alert('Başarılı', 'Profil fotoğrafınız güncellendi.');
       } else {
         Alert.alert('Hata', data.error || 'Yükleme başarısız.');
+        setPhotoUri(profile.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null);
       }
     } catch (error) {
       Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
+      setPhotoUri(profile.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null);
     } finally {
-      setSaving(false);
+      setUploadingPhoto(false);
     }
   };
 
@@ -175,13 +182,24 @@ export default function UserProfileScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView contentContainerStyle={styles.content}>
 
           {/* Avatar */}
           <View style={styles.avatarContainer}>
-            <TouchableOpacity onPress={() => editMode && showImageOptions()} style={styles.avatarWrapper}>
-              {photoUri ? (
+            <TouchableOpacity
+              onPress={() => editMode && showImageOptions()}
+              style={styles.avatarWrapper}
+              activeOpacity={editMode ? 0.7 : 1}
+            >
+              {uploadingPhoto ? (
+                <View style={[styles.avatar, { backgroundColor: '#1a1a2e' }]}>
+                  <ActivityIndicator size="large" color="#4CAF50" />
+                </View>
+              ) : photoUri ? (
                 <Image source={{ uri: photoUri }} style={styles.avatar} />
               ) : (
                 <View style={[styles.avatar, { backgroundColor: '#1a1a2e' }]}>
@@ -196,6 +214,7 @@ export default function UserProfileScreen({ navigation }) {
                 </View>
               )}
             </TouchableOpacity>
+
             <Text style={styles.nameLabel}>{profile?.name}</Text>
             <Text style={styles.emailLabel}>{profile?.email}</Text>
           </View>
@@ -212,6 +231,7 @@ export default function UserProfileScreen({ navigation }) {
                   value={form.name}
                   onChangeText={(t) => setForm({ ...form, name: t })}
                   placeholder="Adınız Soyadınız"
+                  placeholderTextColor="#aaa"
                 />
               ) : (
                 <Text style={styles.fieldValue}>{profile?.name || '—'}</Text>
@@ -229,6 +249,7 @@ export default function UserProfileScreen({ navigation }) {
                     keyboardType="phone-pad"
                     maxLength={11}
                     placeholder="05XX XXX XX XX"
+                    placeholderTextColor="#aaa"
                   />
                   {phoneError ? (
                     <Text style={styles.errorText}>{phoneError}</Text>
@@ -240,12 +261,6 @@ export default function UserProfileScreen({ navigation }) {
                 <Text style={styles.fieldValue}>{profile?.phone || '—'}</Text>
               )}
             </View>
-
-            {editMode && photoUri && !photoUri.startsWith('http') && (
-              <TouchableOpacity style={styles.uploadNowBtn} onPress={uploadPhoto} disabled={saving}>
-                <Text style={styles.uploadNowBtnText}>Yeni Fotoğrafı Şimdi Yükle</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Butonlar */}
@@ -254,7 +269,11 @@ export default function UserProfileScreen({ navigation }) {
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   style={[styles.btn, styles.cancelBtn]}
-                  onPress={() => { setForm({ ...profile }); setPhoneError(''); setEditMode(false); }}
+                  onPress={() => {
+                    setForm({ ...profile });
+                    setPhoneError('');
+                    setEditMode(false);
+                  }}
                 >
                   <Text style={styles.cancelBtnText}>İptal</Text>
                 </TouchableOpacity>
@@ -286,7 +305,6 @@ export default function UserProfileScreen({ navigation }) {
               <Text style={styles.changePasswordBtnText}>Şifre Değiştir</Text>
             </TouchableOpacity>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -313,6 +331,7 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     position: 'relative',
+    marginBottom: 10,
   },
   avatar: {
     width: 100,
@@ -320,7 +339,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#DDD',
+    overflow: 'hidden',
   },
   avatarText: {
     fontSize: 40,
@@ -335,12 +354,16 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: 15,
     elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   nameLabel: {
     fontSize: 22,
     fontWeight: 'bold',
     color: Colors.textDark,
-    marginTop: 10,
+    marginTop: 4,
   },
   emailLabel: {
     fontSize: 14,
@@ -352,12 +375,17 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     elevation: 2,
     marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   sectionTitle: {
     fontSize: 12,
     fontWeight: 'bold',
     color: '#4CAF50',
     marginBottom: 15,
+    letterSpacing: 1,
   },
   field: {
     marginBottom: 15,
@@ -376,6 +404,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#4CAF50',
     paddingVertical: 5,
     fontSize: 16,
+    color: Colors.textDark,
   },
   inputError: {
     borderBottomColor: '#E74C3C',
@@ -418,6 +447,7 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#FFF',
     fontWeight: 'bold',
+    fontSize: 15,
   },
   cancelBtn: {
     backgroundColor: '#EEE',
@@ -425,6 +455,7 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: {
     color: '#333',
+    fontWeight: '500',
   },
   changePasswordBtn: {
     backgroundColor: '#4CAF50',
@@ -436,16 +467,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
-  },
-  uploadNowBtn: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  uploadNowBtnText: {
-    color: '#FFF',
-    textAlign: 'center',
-    fontWeight: 'bold',
   },
 });

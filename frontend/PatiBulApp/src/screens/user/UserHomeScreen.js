@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,23 +9,48 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
+import { Mail } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import config from '../../config';
 
-const QuickActionCard = ({ icon, title, subtitle, color, onPress }) => (
+const API_URL = config.API_URL;
+
+const QuickActionCard = ({ icon, title, subtitle, color, onPress, badge }) => (
   <TouchableOpacity style={[styles.card, { borderLeftColor: color }]} onPress={onPress}>
     <Text style={styles.cardIcon}>{icon}</Text>
     <View style={styles.cardText}>
       <Text style={styles.cardTitle}>{title}</Text>
       <Text style={styles.cardSubtitle}>{subtitle}</Text>
     </View>
+    {badge > 0 && (
+      <View style={styles.cardBadge}>
+        <Text style={styles.cardBadgeText}>{badge}</Text>
+      </View>
+    )}
     <Text style={styles.cardArrow}>›</Text>
   </TouchableOpacity>
 );
 
 const UserHomeScreen = ({ navigation }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/messages/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) setUnreadCount(data.unread_count || 0);
+    } catch (e) {}
+  }, [token]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 15000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -37,19 +62,39 @@ const UserHomeScreen = ({ navigation }) => {
           <Text style={styles.headerGreeting}>Merhaba 👋</Text>
           <Text style={styles.headerName}>{user?.name || 'Kullanıcı'}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.avatarContainer}
-          onPress={() => navigation.navigate('UserProfile')}
-        >
-          {user?.profile_photo ? (
-            <Image
-              source={{ uri: `${config.API_URL}/${user.profile_photo}` }}
-              style={styles.avatarImage}
-            />
-          ) : (
-            <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
-          )}
-        </TouchableOpacity>
+
+        <View style={styles.headerRight}>
+          {/* 📬 Gelen kutusu butonu */}
+          <TouchableOpacity
+            style={styles.inboxBtn}
+            onPress={() => navigation.navigate('Inbox')}
+          >
+            <Mail size={26} color="#fff" />
+            {unreadCount > 0 && (
+              <View style={styles.inboxBadge}>
+                <Text style={styles.inboxBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Profil */}
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            onPress={() => navigation.navigate('UserProfile')}
+          >
+            {user?.profile_photo ? (
+              <Image
+                key={user.profile_photo}
+                source={{ uri: `${config.API_URL}/${user.profile_photo}` }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {user?.name?.[0]?.toUpperCase() || '?'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -81,6 +126,21 @@ const UserHomeScreen = ({ navigation }) => {
           subtitle="Verdiğiniz ilanlar ve veteriner yanıtları"
           color="#7B61FF"
           onPress={() => navigation.navigate('MyReports')}
+        />
+        <QuickActionCard
+          icon="🎉"
+          title="Bulunan Hayvanlar"
+          subtitle="Uygulama sayesinde sahiplerine kavuşan hayvanlar"
+          color="#4CAF50"
+          onPress={() => navigation.navigate('FoundAnimals')}
+        />
+        <QuickActionCard
+          icon="✉️"
+          title="Mesajlarım"
+          subtitle="Kullanıcılarla özel mesajlaşma"
+          color="#007AFF"
+          badge={unreadCount}
+          onPress={() => navigation.navigate('Inbox')}
         />
 
         {/* Bildirim Oluştur */}
@@ -147,6 +207,35 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  inboxBtn: {
+    position: 'relative',
+    padding: 4,
+  },
+  inboxIcon: {
+    fontSize: 26,
+  },
+  inboxBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#FF3B30',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  inboxBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   avatarContainer: {
     width: 44,
@@ -240,6 +329,21 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 12,
     color: '#888',
+  },
+  cardBadge: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    marginRight: 8,
+  },
+  cardBadgeText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   cardArrow: {
     fontSize: 22,

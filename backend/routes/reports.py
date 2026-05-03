@@ -26,6 +26,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
+# ─── Bildirim oluştur ──────────────────────────────────────────────────────
 @reports_bp.route("/", methods=["POST"])
 @jwt_required()
 def create_report():
@@ -54,32 +55,7 @@ def create_report():
     return jsonify({"message": "Bildirim oluşturuldu", "report": report.to_dict()}), 201
 
 
-@reports_bp.route("/<int:report_id>/upload-image", methods=["POST"])
-@jwt_required()
-def upload_image(report_id):
-    user_id = get_jwt_identity()
-    report = PetReport.query.get_or_404(report_id)
-    if report.user_id != int(user_id):
-        return jsonify({"error": "Bu bildirime fotoğraf ekleyemezsiniz"}), 403
-    if "image" not in request.files:
-        return jsonify({"error": "Fotoğraf seçilmedi"}), 400
-    file = request.files["image"]
-    if file.filename == "":
-        return jsonify({"error": "Dosya adı boş"}), 400
-    if not allowed_file(file.filename):
-        return jsonify({"error": "Geçersiz dosya türü"}), 400
-    upload_folder = os.path.join(current_app.root_path, "uploads")
-    os.makedirs(upload_folder, exist_ok=True)
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    filepath = os.path.join(upload_folder, filename)
-    file.save(filepath)
-    image = ReportImage(report_id=report_id, image_url=f"/uploads/{filename}")
-    db.session.add(image)
-    db.session.commit()
-    return jsonify({"message": "Fotoğraf yüklendi", "image": image.to_dict()}), 201
-
-
+# ─── Tüm bildirimleri listele ──────────────────────────────────────────────
 @reports_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_all_reports():
@@ -112,6 +88,7 @@ def get_all_reports():
     return jsonify({"reports": [r.to_dict() for r in reports]}), 200
 
 
+# ─── Kendi bildirimlerini listele ──────────────────────────────────────────
 @reports_bp.route("/my", methods=["GET"])
 @jwt_required()
 def get_my_reports():
@@ -125,6 +102,48 @@ def get_my_reports():
     return jsonify({"reports": [r.to_dict() for r in reports]}), 200
 
 
+# ─── Kapatılan ilanlar (bulunan hayvanlar) ─────────────────────────────────
+# ÖNEMLI: Bu route /<int:report_id> rotalarından ÖNCE olmalı
+@reports_bp.route("/closed", methods=["GET"])
+@jwt_required()
+def get_closed_reports():
+    reports = (
+        PetReport.query
+        .filter_by(status="tamamlandi", report_type="bulunan")
+        .order_by(PetReport.created_at.desc())
+        .all()
+    )
+    return jsonify({"reports": [r.to_dict() for r in reports]}), 200
+
+
+# ─── Fotoğraf yükle ────────────────────────────────────────────────────────
+@reports_bp.route("/<int:report_id>/upload-image", methods=["POST"])
+@jwt_required()
+def upload_image(report_id):
+    user_id = get_jwt_identity()
+    report = PetReport.query.get_or_404(report_id)
+    if report.user_id != int(user_id):
+        return jsonify({"error": "Bu bildirime fotoğraf ekleyemezsiniz"}), 403
+    if "image" not in request.files:
+        return jsonify({"error": "Fotoğraf seçilmedi"}), 400
+    file = request.files["image"]
+    if file.filename == "":
+        return jsonify({"error": "Dosya adı boş"}), 400
+    if not allowed_file(file.filename):
+        return jsonify({"error": "Geçersiz dosya türü"}), 400
+    upload_folder = os.path.join(current_app.root_path, "uploads")
+    os.makedirs(upload_folder, exist_ok=True)
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(upload_folder, filename)
+    file.save(filepath)
+    image = ReportImage(report_id=report_id, image_url=f"/uploads/{filename}")
+    db.session.add(image)
+    db.session.commit()
+    return jsonify({"message": "Fotoğraf yüklendi", "image": image.to_dict()}), 201
+
+
+# ─── Bildirim detayı ───────────────────────────────────────────────────────
 @reports_bp.route("/<int:report_id>", methods=["GET"])
 @jwt_required()
 def get_report(report_id):
@@ -132,6 +151,7 @@ def get_report(report_id):
     return jsonify({"report": report.to_dict()}), 200
 
 
+# ─── Bildirim durumu güncelle (vet) ────────────────────────────────────────
 @reports_bp.route("/<int:report_id>/status", methods=["PUT"])
 @jwt_required()
 def update_status(report_id):
@@ -149,6 +169,7 @@ def update_status(report_id):
     return jsonify({"message": "Durum güncellendi", "report": report.to_dict()}), 200
 
 
+# ─── Bildirime yanıt ver (vet) ─────────────────────────────────────────────
 @reports_bp.route("/<int:report_id>/respond", methods=["POST"])
 @jwt_required()
 def respond_to_report(report_id):
@@ -173,7 +194,7 @@ def respond_to_report(report_id):
     return jsonify({"message": "Yanıt gönderildi", "response": response.to_dict()}), 201
 
 
-# ─── Kullanıcı: Veterinere mesaj gönder ───────────────────────────────────
+# ─── Kullanıcı: veterinere mesaj gönder ───────────────────────────────────
 @reports_bp.route("/<int:report_id>/user-message", methods=["POST"])
 @jwt_required()
 def user_message(report_id):
@@ -198,6 +219,7 @@ def user_message(report_id):
     return jsonify({"message": "Mesaj gönderildi", "response": response.to_dict()}), 201
 
 
+# ─── Bildirimin yanıtlarını getir ─────────────────────────────────────────
 @reports_bp.route("/<int:report_id>/responses", methods=["GET"])
 @jwt_required()
 def get_responses(report_id):
@@ -211,6 +233,7 @@ def get_responses(report_id):
     return jsonify({"responses": [r.to_dict() for r in responses]}), 200
 
 
+# ─── Bildirim sil ──────────────────────────────────────────────────────────
 @reports_bp.route("/<int:report_id>", methods=["DELETE"])
 @jwt_required()
 def delete_report(report_id):
@@ -223,6 +246,7 @@ def delete_report(report_id):
     return jsonify({"message": "Bildirim silindi"}), 200
 
 
+# ─── Bildirim düzenle ──────────────────────────────────────────────────────
 @reports_bp.route("/<int:report_id>", methods=["PUT"])
 @jwt_required()
 def update_report(report_id):
@@ -243,3 +267,17 @@ def update_report(report_id):
         report.longitude = data["longitude"]
     db.session.commit()
     return jsonify({"message": "Bildirim güncellendi", "report": report.to_dict()}), 200
+
+
+# ─── İlanı kapat - bulunan olarak işaretle ────────────────────────────────
+@reports_bp.route("/<int:report_id>/close", methods=["PUT"])
+@jwt_required()
+def close_report(report_id):
+    user_id = get_jwt_identity()
+    report = PetReport.query.get_or_404(report_id)
+    if report.user_id != int(user_id):
+        return jsonify({"error": "Bu bildirimi kapatma yetkiniz yok"}), 403
+    report.status = "tamamlandi"
+    report.report_type = "bulunan"
+    db.session.commit()
+    return jsonify({"message": "İlan kapatıldı", "report": report.to_dict()}), 200
