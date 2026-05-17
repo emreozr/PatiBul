@@ -5,9 +5,11 @@ from app import bcrypt, mail
 from config import Config
 from datetime import datetime, timedelta
 import secrets
+import random
 from flask_mail import Message
 
 auth_bp = Blueprint("auth", __name__)
+
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
@@ -32,6 +34,7 @@ def register():
     db.session.commit()
     return jsonify({"message": "Kayıt başarılı", "user": user.to_dict()}), 201
 
+
 @auth_bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -50,62 +53,125 @@ def login():
         "user": user.to_dict(),
     }), 200
 
+
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
     try:
         data = request.get_json()
         if not data.get("email"):
             return jsonify({"error": "E-posta zorunludur"}), 400
+
         user = User.query.filter_by(email=data["email"]).first()
+
+        # Kullanıcı bulunamasa bile aynı yanıtı dön (güvenlik)
         if not user:
-            return jsonify({"message": "E-posta gönderimi başarılı"}), 200
-        token = secrets.token_urlsafe(32)
+            return jsonify({"message": "Kod gönderildi"}), 200
+
+        # 6 haneli kod üret
+        code = str(random.randint(100000, 999999))
+
+        # Eski tokenları geçersiz kıl
+        PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({"used": True})
+        db.session.commit()
+
         expires_at = datetime.utcnow() + timedelta(seconds=Config.PASSWORD_RESET_TOKEN_EXPIRY)
         reset_token = PasswordResetToken(
             user_id=user.id,
-            token=token,
+            token=code,
             expires_at=expires_at
         )
         db.session.add(reset_token)
         db.session.commit()
-        # Frontend URL'nize göre burayı güncelleyebilirsiniz
-        reset_link = f"http://localhost:3000/reset-password?token={token}"
+
+        # Mail gönder
         msg = Message(
-            "PatiBul - Şifre Sıfırlama",
+            subject="PatiBul - Şifre Sıfırlama Kodu",
             sender=Config.MAIL_DEFAULT_SENDER,
             recipients=[user.email]
         )
-        msg.body = f"Merhaba {user.name},\n\nŞifrenizi sıfırlamak için şu linke tıklayın: {reset_link}"
+        msg.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 30px; background: #f9f9f9; border-radius: 12px;">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="color: #3DAA6E; font-size: 28px; margin: 0;">🐾 PatiBul</h1>
+            </div>
+            <h2 style="color: #333; font-size: 20px;">Şifre Sıfırlama</h2>
+            <p style="color: #555; font-size: 15px;">Merhaba <strong>{user.name}</strong>,</p>
+            <p style="color: #555; font-size: 15px;">Şifrenizi sıfırlamak için aşağıdaki 6 haneli kodu uygulamaya girin:</p>
+            <div style="text-align: center; margin: 32px 0;">
+                <span style="font-size: 42px; font-weight: bold; letter-spacing: 10px; color: #3DAA6E; background: #E8F5E9; padding: 16px 28px; border-radius: 12px;">{code}</span>
+            </div>
+            <p style="color: #888; font-size: 13px;">Bu kod <strong>15 dakika</strong> geçerlidir.</p>
+            <p style="color: #888; font-size: 13px;">Eğer bu isteği siz yapmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+            <p style="color: #bbb; font-size: 12px; text-align: center;">PatiBul — Kayıp Hayvan Takip Sistemi</p>
+        </div>
+        """
         mail.send(msg)
-        return jsonify({"message": "Şifre sıfırlama e-postası gönderildi"}), 200
+
+        return jsonify({"message": "Kod gönderildi"}), 200
+
     except Exception as e:
         print(f"MAIL_ERROR: {str(e)}")
         return jsonify({"error": "E-posta gönderilemedi"}), 500
 
+
 @auth_bp.route("/verify-reset-token", methods=["POST"])
 def verify_reset_token():
     data = request.get_json()
-    token = data.get("token")
-    token_record = PasswordResetToken.query.filter_by(token=token).first()
-    if not token_record or token_record.used or datetime.utcnow() > token_record.expires_at:
-        return jsonify({"error": "Geçersiz veya süresi dolmuş token"}), 401
-    return jsonify({"message": "Token geçerli", "user_id": token_record.user_id}), 200
+    code = data.get("token")
+    email = data.get("email")
+
+    if not code or not email:
+        return jsonify({"error": "Kod ve e-posta zorunludur"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "Geçersiz kod"}), 401
+
+    token_record = PasswordResetToken.query.filter_by(
+        token=code,
+        user_id=user.id,
+        used=False
+    ).first()
+
+    if not token_record or datetime.utcnow() > token_record.expires_at:
+        return jsonify({"error": "Kod geçersiz veya süresi dolmuş"}), 401
+
+    return jsonify({"message": "Kod geçerli", "user_id": user.id}), 200
+
 
 @auth_bp.route("/reset-password", methods=["POST"])
 def reset_password():
     data = request.get_json()
-    token = data.get("token")
+    code = data.get("token")
+    email = data.get("email")
     new_password = data.get("new_password")
-    token_record = PasswordResetToken.query.filter_by(token=token).first()
-    if not token_record or token_record.used or datetime.utcnow() > token_record.expires_at:
-        return jsonify({"error": "İşlem geçersiz"}), 401
-    user = db.session.get(User, token_record.user_id)
-    if user:
-        user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
-        token_record.used = True
-        db.session.commit()
-        return jsonify({"message": "Şifre güncellendi"}), 200
-    return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+
+    if not code or not email or not new_password:
+        return jsonify({"error": "Eksik alanlar"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "Şifre en az 6 karakter olmalıdır"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "Geçersiz işlem"}), 401
+
+    token_record = PasswordResetToken.query.filter_by(
+        token=code,
+        user_id=user.id,
+        used=False
+    ).first()
+
+    if not token_record or datetime.utcnow() > token_record.expires_at:
+        return jsonify({"error": "Kod geçersiz veya süresi dolmuş"}), 401
+
+    user.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+    token_record.used = True
+    db.session.commit()
+
+    return jsonify({"message": "Şifre güncellendi"}), 200
+
 
 @auth_bp.route("/change-password", methods=["PUT"])
 @jwt_required()
