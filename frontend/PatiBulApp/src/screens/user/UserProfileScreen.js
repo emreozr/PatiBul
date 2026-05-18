@@ -12,7 +12,6 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
 import { apiFetch } from '../../services/api';
@@ -20,18 +19,29 @@ import * as ImagePicker from 'expo-image-picker';
 import config from '../../config';
 
 export default function UserProfileScreen({ navigation }) {
-  const { token, user: authUser, login } = useAuth();
+  const { token, user: authUser, login, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [editMode, setEditMode] = useState(false);
-
   const [photoUri, setPhotoUri] = useState(null);
-  const [profile, setProfile] = useState({ name: '', email: '', phone: '', profile_photo: '' });
-  const [form, setForm] = useState({ name: '', email: '', phone: '', profile_photo: '' });
+  const [profile, setProfile] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    profile_photo: '',
+  });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    profile_photo: '',
+  });
   const [phoneError, setPhoneError] = useState('');
 
-  useEffect(() => { fetchProfile(); }, []);
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -46,9 +56,7 @@ export default function UserProfileScreen({ navigation }) {
       };
       setProfile(loaded);
       setForm(loaded);
-      if (u.profile_photo) {
-        setPhotoUri(`${config.API_URL}/${u.profile_photo}`);
-      }
+      if (u.profile_photo) setPhotoUri(`${config.API_URL}/${u.profile_photo}`);
     } catch (error) {
       console.log('Profil çekme hatası:', error);
     } finally {
@@ -59,7 +67,7 @@ export default function UserProfileScreen({ navigation }) {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Kamera kullanımı için izin vermeniz gerekiyor.');
+      Alert.alert('İzin Gerekli', 'Kamera izni gerekiyor.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -67,15 +75,13 @@ export default function UserProfileScreen({ navigation }) {
       aspect: [1, 1],
       quality: 0.7,
     });
-    if (!result.canceled) {
-      uploadPhoto(result.assets[0].uri);
-    }
+    if (!result.canceled) uploadPhoto(result.assets[0].uri);
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('İzin Gerekli', 'Galeriye erişim için izin vermeniz gerekiyor.');
+      Alert.alert('İzin Gerekli', 'Galeri izni gerekiyor.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -84,9 +90,7 @@ export default function UserProfileScreen({ navigation }) {
       aspect: [1, 1],
       quality: 0.7,
     });
-    if (!result.canceled) {
-      uploadPhoto(result.assets[0].uri);
-    }
+    if (!result.canceled) uploadPhoto(result.assets[0].uri);
   };
 
   const showImageOptions = () => {
@@ -103,31 +107,31 @@ export default function UserProfileScreen({ navigation }) {
     const formData = new FormData();
     const uriParts = uri.split('.');
     const fileType = uriParts[uriParts.length - 1].toLowerCase();
-    const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg';
     formData.append('photo', {
       uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
       name: `profile_${Date.now()}.${fileType}`,
-      type: mimeType,
+      type: fileType === 'png' ? 'image/png' : 'image/jpeg',
     });
     try {
       const response = await fetch(`${config.API_URL}/api/user/profile/photo`, {
         method: 'POST',
         body: formData,
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
       });
       const data = await response.json();
       if (response.ok) {
         login(token, { ...authUser, profile_photo: data.photo_url });
-        setProfile(prev => ({ ...prev, profile_photo: data.photo_url }));
+        setProfile((prev) => ({ ...prev, profile_photo: data.photo_url }));
         setPhotoUri(`${config.API_URL}/${data.photo_url}`);
         Alert.alert('Başarılı', 'Profil fotoğrafınız güncellendi.');
       } else {
         Alert.alert('Hata', data.error || 'Yükleme başarısız.');
-        setPhotoUri(profile.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null);
       }
     } catch (error) {
       Alert.alert('Hata', 'Sunucuya bağlanılamadı.');
-      setPhotoUri(profile.profile_photo ? `${config.API_URL}/${profile.profile_photo}` : null);
     } finally {
       setUploadingPhoto(false);
     }
@@ -137,11 +141,11 @@ export default function UserProfileScreen({ navigation }) {
     const cleaned = text.replace(/[^0-9]/g, '');
     if (cleaned.length <= 11) {
       setForm({ ...form, phone: cleaned });
-      if (cleaned.length > 0 && cleaned.length < 10) {
-        setPhoneError('Telefon numarası en az 10 haneli olmalıdır');
-      } else {
-        setPhoneError('');
-      }
+      setPhoneError(
+        cleaned.length > 0 && cleaned.length < 10
+          ? 'En az 10 haneli olmalıdır'
+          : ''
+      );
     }
   };
 
@@ -175,144 +179,145 @@ export default function UserProfileScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
       >
-        <ScrollView contentContainerStyle={styles.content}>
+        {/* Avatar */}
+        <View style={styles.avatarContainer}>
+          <TouchableOpacity
+            onPress={() => editMode && showImageOptions()}
+            style={styles.avatarWrapper}
+            activeOpacity={editMode ? 0.7 : 1}
+          >
+            {uploadingPhoto ? (
+              <View style={styles.avatar}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+              </View>
+            ) : photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: '#1a1a2e' }]}>
+                <Text style={styles.avatarText}>
+                  {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
+                </Text>
+              </View>
+            )}
+            {editMode && (
+              <View style={styles.editBadge}>
+                <Text style={{ fontSize: 14 }}>📷</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.nameLabel}>{profile?.name}</Text>
+          <Text style={styles.emailLabel}>{profile?.email}</Text>
+        </View>
 
-          {/* Avatar */}
-          <View style={styles.avatarContainer}>
-            <TouchableOpacity
-              onPress={() => editMode && showImageOptions()}
-              style={styles.avatarWrapper}
-              activeOpacity={editMode ? 0.7 : 1}
-            >
-              {uploadingPhoto ? (
-                <View style={[styles.avatar, { backgroundColor: '#1a1a2e' }]}>
-                  <ActivityIndicator size="large" color="#4CAF50" />
-                </View>
-              ) : photoUri ? (
-                <Image source={{ uri: photoUri }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: '#1a1a2e' }]}>
-                  <Text style={styles.avatarText}>
-                    {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
-                  </Text>
-                </View>
-              )}
-              {editMode && (
-                <View style={styles.editBadge}>
-                  <Text style={{ fontSize: 14 }}>📷</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.nameLabel}>{profile?.name}</Text>
-            <Text style={styles.emailLabel}>{profile?.email}</Text>
+        {/* Kişisel Bilgiler */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>KİŞİSEL BİLGİLER</Text>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Ad Soyad</Text>
+            {editMode ? (
+              <TextInput
+                style={styles.input}
+                value={form.name}
+                onChangeText={(t) => setForm({ ...form, name: t })}
+                placeholder="Adınız Soyadınız"
+                placeholderTextColor="#aaa"
+              />
+            ) : (
+              <Text style={styles.fieldValue}>{profile?.name || '—'}</Text>
+            )}
           </View>
-
-          {/* Kişisel Bilgiler */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>KİŞİSEL BİLGİLER</Text>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Ad Soyad</Text>
-              {editMode ? (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Telefon</Text>
+            {editMode ? (
+              <>
                 <TextInput
-                  style={styles.input}
-                  value={form.name}
-                  onChangeText={(t) => setForm({ ...form, name: t })}
-                  placeholder="Adınız Soyadınız"
+                  style={[styles.input, phoneError ? styles.inputError : null]}
+                  value={form.phone}
+                  onChangeText={handlePhoneChange}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  placeholder="05XX XXX XX XX"
                   placeholderTextColor="#aaa"
                 />
-              ) : (
-                <Text style={styles.fieldValue}>{profile?.name || '—'}</Text>
-              )}
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Telefon</Text>
-              {editMode ? (
-                <>
-                  <TextInput
-                    style={[styles.input, phoneError ? styles.inputError : null]}
-                    value={form.phone}
-                    onChangeText={handlePhoneChange}
-                    keyboardType="phone-pad"
-                    maxLength={11}
-                    placeholder="05XX XXX XX XX"
-                    placeholderTextColor="#aaa"
-                  />
-                  {phoneError ? (
-                    <Text style={styles.errorText}>{phoneError}</Text>
-                  ) : (
-                    <Text style={styles.hintText}>{form.phone.length}/11</Text>
-                  )}
-                </>
-              ) : (
-                <Text style={styles.fieldValue}>{profile?.phone || '—'}</Text>
-              )}
-            </View>
-          </View>
-
-          {/* Butonlar */}
-          <View style={{ gap: 12 }}>
-            {editMode ? (
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.btn, styles.cancelBtn]}
-                  onPress={() => {
-                    setForm({ ...profile });
-                    setPhoneError('');
-                    setEditMode(false);
-                  }}
-                >
-                  <Text style={styles.cancelBtnText}>İptal</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btn, styles.saveBtn]}
-                  onPress={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.saveBtnText}>Kaydet</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+                {phoneError ? (
+                  <Text style={styles.errorText}>{phoneError}</Text>
+                ) : (
+                  <Text style={styles.hintText}>{form.phone.length}/11</Text>
+                )}
+              </>
             ) : (
-              <TouchableOpacity
-                style={styles.editProfileBtn}
-                onPress={() => setEditMode(true)}
-              >
-                <Text style={styles.editProfileBtnText}>Profili Düzenle</Text>
-              </TouchableOpacity>
+              <Text style={styles.fieldValue}>{profile?.phone || '—'}</Text>
             )}
-
-            <TouchableOpacity
-              style={styles.changePasswordBtn}
-              onPress={() => navigation.navigate('ChangePassword')}
-            >
-              <Text style={styles.changePasswordBtnText}>Şifre Değiştir</Text>
-            </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </View>
+
+        {/* Butonlar */}
+        <View style={{ gap: 12 }}>
+          {editMode ? (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.cancelBtn]}
+                onPress={() => {
+                  setForm({ ...profile });
+                  setPhoneError('');
+                  setEditMode(false);
+                }}
+              >
+                <Text style={styles.cancelBtnText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.saveBtn]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Kaydet</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.editProfileBtn}
+              onPress={() => setEditMode(true)}
+            >
+              <Text style={styles.editProfileBtnText}>Profili Düzenle</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.changePasswordBtn}
+            onPress={() => navigation.navigate('ChangePassword')}
+          >
+            <Text style={styles.changePasswordBtnText}>Şifre Değiştir</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+            <Text style={styles.logoutBtnText}>Çıkış Yap</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
@@ -327,7 +332,8 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    marginTop: 8,
   },
   avatarWrapper: {
     position: 'relative',
@@ -383,7 +389,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: Colors.primary,
     marginBottom: 15,
     letterSpacing: 1,
   },
@@ -401,7 +407,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderBottomWidth: 1,
-    borderBottomColor: '#4CAF50',
+    borderBottomColor: Colors.primary,
     paddingVertical: 5,
     fontSize: 16,
     color: Colors.textDark,
@@ -441,7 +447,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   saveBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: Colors.primary,
     flex: 2,
   },
   saveBtnText: {
@@ -458,13 +464,26 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   changePasswordBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1a1a2e',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
   },
   changePasswordBtnText: {
     color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  logoutBtn: {
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FF6B6B',
+    backgroundColor: '#fff',
+  },
+  logoutBtnText: {
+    color: '#FF6B6B',
     fontWeight: '700',
     fontSize: 15,
   },

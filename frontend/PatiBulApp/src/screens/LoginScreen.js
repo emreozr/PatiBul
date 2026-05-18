@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, Alert, ActivityIndicator,
+  TouchableOpacity, TextInput,
+} from 'react-native';
 import KeyboardSafeView from '../components/KeyboardSafeView';
-import InputField from '../components/InputField';
-import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../services/api';
@@ -42,34 +43,147 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <KeyboardSafeView backgroundColor={Colors.background} contentStyle={styles.content}>
+    <KeyboardSafeView
+      backgroundColor={Colors.background}
+      contentStyle={styles.content}
+      useSafeArea={true}
+    >
       <View style={styles.headerContainer}>
         <Text style={styles.title}>PatiBul</Text>
+        <Text style={styles.subtitle}>Hesabınıza giriş yapın</Text>
       </View>
+
       <View style={styles.formContainer}>
-        <InputField label="E-posta" placeholder="E-posta adresinizi girin" value={email} onChangeText={setEmail} keyboardType="email-address" />
-        <InputField label="Şifre" placeholder="Şifrenizi girin" value={password} onChangeText={setPassword} secureTextEntry={true} />
+        {/* E-posta */}
+        <Text style={styles.label}>E-posta</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="E-posta adresinizi girin"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        {/* Şifre */}
+        <Text style={styles.label}>Şifre</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Şifrenizi girin"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={true}
+        />
+
         {loading ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={styles.loginButton} />
+          <ActivityIndicator size="large" color="#fff" style={styles.loginButton} />
         ) : (
-          <CustomButton title="Giriş Yap" onPress={handleLogin} style={styles.loginButton} />
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
+            <Text style={styles.primaryBtnText}>Giriş Yap</Text>
+          </TouchableOpacity>
         )}
-        <CustomButton title="Hesabın yok mu? Kayıt Ol" type="secondary" onPress={() => navigation.navigate('Register')} />
-        <Text style={styles.forgotPasswordLink} onPress={() => navigation.navigate('ForgotPassword')}>
-          Şifremi Unuttum?
-        </Text>
+
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          onPress={() => navigation.navigate('Register')}
+        >
+          <Text style={styles.secondaryBtnText}>Hesabın yok mu? Kayıt Ol</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.forgotBtn}
+          onPress={() => navigation.navigate('ForgotPassword')}
+        >
+          <Text style={styles.forgotBtnText}>Şifremi Unuttum?</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardSafeView>
   );
 };
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center', padding: 20 },
-  headerContainer: { alignItems: 'center', marginBottom: 40 },
-  title: { fontSize: 42, fontWeight: 'bold', color: Colors.primary, marginBottom: 10 },
-  formContainer: { width: '100%' },
-  loginButton: { marginTop: 20, marginBottom: 10 },
-  forgotPasswordLink: { color: Colors.primary, fontSize: 14, marginTop: 10, textAlign: 'right', textDecorationLine: 'underline' },
+  content: {
+    justifyContent: 'center',
+    padding: 28,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 42,
+    fontWeight: '400',
+    color: '#fff',
+    marginBottom: 8,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '300',
+  },
+  formContainer: {
+    width: '100%',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#fff',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  loginButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  primaryBtn: {
+    backgroundColor: '#1a1a2e',
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryBtn: {
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+    marginBottom: 16,
+  },
+  secondaryBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  forgotBtn: {
+    alignItems: 'flex-end',
+  },
+  forgotBtnText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
 });
 
 export default LoginScreen;

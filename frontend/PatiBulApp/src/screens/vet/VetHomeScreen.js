@@ -43,7 +43,6 @@ const ReportCard = ({ item, onPress }) => {
       style={[styles.reportCard, isNew && { borderColor: '#FF9500', borderWidth: 1 }]}
       onPress={() => onPress(item)}
     >
-      {/* Fotoğraf */}
       {firstImage && (
         <RNImage
           source={{ uri: `${config.API_URL}${firstImage.image_url}` }}
@@ -51,7 +50,6 @@ const ReportCard = ({ item, onPress }) => {
           resizeMode="cover"
         />
       )}
-
       <View style={styles.cardContent}>
         <View style={styles.reportCardHeader}>
           <View style={[styles.typeBadge, { backgroundColor: type.color + '22' }]}>
@@ -82,22 +80,17 @@ const ReportCard = ({ item, onPress }) => {
 };
 
 const VetHomeScreen = ({ navigation }) => {
-  const { user, logout, token } = useAuth();
+  const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('beklemede');
   const [allReports, setAllReports] = useState([]);
-
   const { loading, error, execute } = useApi();
 
   const fetchReports = useCallback(async () => {
     const result = await execute('/api/reports/', { token });
-    if (result) {
-      setAllReports(result.reports || []);
-    }
+    if (result) setAllReports(result.reports || []);
   }, [token, execute]);
 
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
+  useEffect(() => { fetchReports(); }, [fetchReports]);
 
   const tabs = [
     { key: 'beklemede', label: 'Bekleyenler' },
@@ -123,7 +116,7 @@ const VetHomeScreen = ({ navigation }) => {
 
   if (error && allReports.length === 0) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
         <View style={styles.header}>
           <View>
@@ -139,7 +132,7 @@ const VetHomeScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
 
       {/* Header */}
@@ -185,12 +178,12 @@ const VetHomeScreen = ({ navigation }) => {
         ))}
       </View>
 
+      {/* Content */}
       <View style={styles.content}>
         {error && allReports.length > 0 && (
           <ErrorBanner errorType={error.type} onRetry={fetchReports} />
         )}
 
-        {/* Sekmeler */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -209,7 +202,6 @@ const VetHomeScreen = ({ navigation }) => {
           ))}
         </ScrollView>
 
-        {/* Liste */}
         {loading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
         ) : (
@@ -236,10 +228,6 @@ const VetHomeScreen = ({ navigation }) => {
           />
         )}
       </View>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>Çıkış Yap</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -369,22 +357,6 @@ const styles = StyleSheet.create({
   cardContent: {
     padding: 16,
   },
-  newBadgeInline: {
-    backgroundColor: '#FF9500',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginRight: 6,
-  },
-  newBadgeInlineText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  rightBadgesContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   reportCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -404,6 +376,22 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  rightBadgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  newBadgeInline: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginRight: 6,
+  },
+  newBadgeInlineText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -454,20 +442,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 15,
     color: '#aaa',
-  },
-  logoutButton: {
-    margin: 16,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-  },
-  logoutText: {
-    color: '#FF6B6B',
-    fontWeight: '600',
-    fontSize: 15,
   },
 });
 

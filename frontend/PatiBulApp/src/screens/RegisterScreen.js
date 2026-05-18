@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import {
+  View, Text, StyleSheet, Alert, ActivityIndicator,
+  TouchableOpacity, TextInput,
+} from 'react-native';
 import KeyboardSafeView from '../components/KeyboardSafeView';
-import InputField from '../components/InputField';
-import CustomButton from '../components/CustomButton';
 import Colors from '../styles/colors';
 import { apiFetch, ApiError, ERROR_TYPES, ERROR_MESSAGES } from '../services/api';
 
@@ -44,64 +45,208 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   return (
-    <KeyboardSafeView backgroundColor={Colors.background} contentStyle={styles.content}>
+    <KeyboardSafeView
+      backgroundColor={Colors.background}
+      contentStyle={styles.content}
+      useSafeArea={true}
+    >
       <View style={styles.headerContainer}>
         <Text style={styles.title}>Kayıt Ol</Text>
         <Text style={styles.subtitle}>Yeni bir hesap oluşturun</Text>
       </View>
 
       <View style={styles.formContainer}>
-        <Text style={styles.roleLabel}>Hesap Türü</Text>
+        {/* Hesap Türü */}
+        <Text style={styles.label}>Hesap Türü</Text>
         <View style={styles.roleContainer}>
           <TouchableOpacity
             style={[styles.roleButton, role === 'user' && styles.roleButtonActive]}
             onPress={() => setRole('user')}
           >
             <Text style={styles.roleIcon}>🐾</Text>
-            <Text style={[styles.roleButtonText, role === 'user' && styles.roleButtonTextActive]}>Hayvan Sahibi</Text>
-            <Text style={[styles.roleButtonSub, role === 'user' && styles.roleButtonSubActive]}>Kayıp ilanı ver, bildirim yap</Text>
+            <Text style={[styles.roleButtonText, role === 'user' && styles.roleButtonTextActive]}>
+              Hayvan Sahibi
+            </Text>
+            <Text style={[styles.roleButtonSub, role === 'user' && styles.roleButtonSubActive]}>
+              Kayıp ilanı ver
+            </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.roleButton, role === 'vet' && styles.roleButtonActive]}
             onPress={() => setRole('vet')}
           >
             <Text style={styles.roleIcon}>🏥</Text>
-            <Text style={[styles.roleButtonText, role === 'vet' && styles.roleButtonTextActive]}>Veteriner Kliniği</Text>
-            <Text style={[styles.roleButtonSub, role === 'vet' && styles.roleButtonSubActive]}>Bildirimleri yönet, yanıt ver</Text>
+            <Text style={[styles.roleButtonText, role === 'vet' && styles.roleButtonTextActive]}>
+              Veteriner
+            </Text>
+            <Text style={[styles.roleButtonSub, role === 'vet' && styles.roleButtonSubActive]}>
+              Bildirimleri yönet
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <InputField label="Ad Soyad" placeholder="Adınızı ve soyadınızı girin" value={username} onChangeText={setUsername} />
-        <InputField label="E-posta" placeholder="E-posta adresinizi girin" value={email} onChangeText={setEmail} keyboardType="email-address" />
-        <InputField label="Şifre" placeholder="Şifrenizi girin" value={password} onChangeText={setPassword} secureTextEntry={true} />
+        {/* Ad Soyad */}
+        <Text style={styles.label}>Ad Soyad</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Adınızı ve soyadınızı girin"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={username}
+          onChangeText={setUsername}
+        />
+
+        {/* E-posta */}
+        <Text style={styles.label}>E-posta</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="E-posta adresinizi girin"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        {/* Şifre */}
+        <Text style={styles.label}>Şifre</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Şifrenizi girin"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={true}
+        />
 
         {loading ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={styles.registerButton} />
+          <ActivityIndicator size="large" color="#fff" style={{ marginTop: 16 }} />
         ) : (
-          <CustomButton title="Kayıt Ol" onPress={handleRegister} style={styles.registerButton} />
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister}>
+            <Text style={styles.primaryBtnText}>Kayıt Ol</Text>
+          </TouchableOpacity>
         )}
-        <CustomButton title="Zaten hesabın var mı? Giriş Yap" type="secondary" onPress={() => navigation.navigate('Login')} />
+
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Text style={styles.secondaryBtnText}>Zaten hesabın var mı? Giriş Yap</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardSafeView>
   );
 };
 
 const styles = StyleSheet.create({
-  content: { padding: 20, justifyContent: 'center' },
-  headerContainer: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
-  title: { fontSize: 36, fontWeight: 'bold', color: Colors.primary, marginBottom: 10 },
-  subtitle: { fontSize: 18, color: Colors.textLight },
-  formContainer: { width: '100%' },
-  roleLabel: { fontSize: 14, fontWeight: '600', color: '#444', marginBottom: 10 },
-  roleContainer: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  roleButton: { flex: 1, borderWidth: 2, borderColor: '#e0e0e0', borderRadius: 14, padding: 14, alignItems: 'center', backgroundColor: '#fff' },
-  roleButtonActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '11' },
-  roleIcon: { fontSize: 28, marginBottom: 6 },
-  roleButtonText: { fontSize: 13, fontWeight: '700', color: '#666', textAlign: 'center', marginBottom: 4 },
-  roleButtonTextActive: { color: Colors.primary },
-  roleButtonSub: { fontSize: 10, color: '#aaa', textAlign: 'center' },
-  roleButtonSubActive: { color: Colors.primary },
-  registerButton: { marginTop: 20, marginBottom: 10 },
+  content: {
+    padding: 28,
+    justifyContent: 'center',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 28,
+    marginTop: 10,
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: '400',
+    color: '#fff',
+    marginBottom: 6,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '300',
+  },
+  formContainer: {
+    width: '100%',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#fff',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  roleButton: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  roleButtonActive: {
+    borderColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  roleIcon: {
+    fontSize: 26,
+    marginBottom: 6,
+  },
+  roleButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginBottom: 3,
+  },
+  roleButtonTextActive: {
+    color: '#fff',
+  },
+  roleButtonSub: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+  },
+  roleButtonSubActive: {
+    color: 'rgba(255,255,255,0.85)',
+  },
+  primaryBtn: {
+    backgroundColor: '#1a1a2e',
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryBtn: {
+    backgroundColor: 'transparent',
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  secondaryBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '500',
+  },
 });
 
 export default RegisterScreen;

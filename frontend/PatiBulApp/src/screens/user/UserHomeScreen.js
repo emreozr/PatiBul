@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mail } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
@@ -33,7 +33,7 @@ const QuickActionCard = ({ icon, title, subtitle, color, onPress, badge }) => (
 );
 
 const UserHomeScreen = ({ navigation }) => {
-  const { user, logout, token } = useAuth();
+  const { user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchUnreadCount = useCallback(async () => {
@@ -53,22 +53,17 @@ const UserHomeScreen = ({ navigation }) => {
   }, [fetchUnreadCount]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
 
-      {/* Header */}
+      {/* Header - yeşil */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerGreeting}>Merhaba 👋</Text>
           <Text style={styles.headerName}>{user?.name || 'Kullanıcı'}</Text>
         </View>
-
         <View style={styles.headerRight}>
-          {/* 📬 Gelen kutusu butonu */}
-          <TouchableOpacity
-            style={styles.inboxBtn}
-            onPress={() => navigation.navigate('Inbox')}
-          >
+          <TouchableOpacity style={styles.inboxBtn} onPress={() => navigation.navigate('Inbox')}>
             <Mail size={26} color="#fff" />
             {unreadCount > 0 && (
               <View style={styles.inboxBadge}>
@@ -76,8 +71,6 @@ const UserHomeScreen = ({ navigation }) => {
               </View>
             )}
           </TouchableOpacity>
-
-          {/* Profil */}
           <TouchableOpacity
             style={styles.avatarContainer}
             onPress={() => navigation.navigate('UserProfile')}
@@ -89,30 +82,29 @@ const UserHomeScreen = ({ navigation }) => {
                 style={styles.avatarImage}
               />
             ) : (
-              <Text style={styles.avatarText}>
-                {user?.name?.[0]?.toUpperCase() || '?'}
-              </Text>
+              <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-
+      {/* Content */}
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Banner */}
         <View style={styles.banner}>
           <Text style={styles.bannerIcon}>🐾</Text>
           <View style={styles.bannerText}>
             <Text style={styles.bannerTitle}>PatiBul'a hoş geldiniz!</Text>
-            <Text style={styles.bannerSubtitle}>
-              Kayıp ilanlarını görün, bildirim oluşturun.
-            </Text>
+            <Text style={styles.bannerSubtitle}>Kayıp ilanlarını görün, bildirim oluşturun.</Text>
           </View>
         </View>
 
         {/* İlanlar */}
         <Text style={styles.sectionTitle}>İlanlar</Text>
-
         <QuickActionCard
           icon="📋"
           title="Tüm İlanlar"
@@ -145,7 +137,6 @@ const UserHomeScreen = ({ navigation }) => {
 
         {/* Bildirim Oluştur */}
         <Text style={styles.sectionTitle}>Bildirim Oluştur</Text>
-
         <QuickActionCard
           icon="🚨"
           title="Kayıp İlanı Ver"
@@ -175,12 +166,7 @@ const UserHomeScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('NearbyVets')}
         />
 
-        {/* Çıkış */}
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Text style={styles.logoutText}>Çıkış Yap</Text>
-        </TouchableOpacity>
 
-        <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -216,9 +202,6 @@ const styles = StyleSheet.create({
   inboxBtn: {
     position: 'relative',
     padding: 4,
-  },
-  inboxIcon: {
-    fontSize: 26,
   },
   inboxBadge: {
     position: 'absolute',
@@ -260,8 +243,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 24,
+    paddingBottom: 24,
   },
   banner: {
     flexDirection: 'row',
@@ -363,9 +349,6 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontWeight: '600',
     fontSize: 15,
-  },
-  bottomSpace: {
-    height: 40,
   },
 });
 

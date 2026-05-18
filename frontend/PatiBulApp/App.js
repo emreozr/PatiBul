@@ -21,6 +21,9 @@ import AllReportsScreen from './src/screens/user/AllReportsScreen';
 import MyReportsScreen from './src/screens/user/MyReportsScreen';
 import ReportDetailScreen from './src/screens/user/ReportDetailScreen';
 import ChangePasswordScreen from './src/screens/user/ChangePasswordScreen';
+import InboxScreen from './src/screens/user/InboxScreen';
+import ConversationScreen from './src/screens/user/ConversationScreen';
+import FoundAnimalsScreen from './src/screens/user/FoundAnimalsScreen';
 
 // Vet Screens
 import VetHomeScreen from './src/screens/vet/VetHomeScreen';
@@ -29,11 +32,14 @@ import VetProfileScreen from './src/screens/vet/VetProfileScreen';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
-import InboxScreen from './src/screens/user/InboxScreen';
-import ConversationScreen from './src/screens/user/ConversationScreen';
-import FoundAnimalsScreen from './src/screens/user/FoundAnimalsScreen';
-
 const Stack = createStackNavigator();
+
+const defaultScreenOptions = {
+  headerStyle: { backgroundColor: Colors.primary },
+  headerTintColor: Colors.white,
+  headerTitleStyle: { fontWeight: 'bold' },
+  headerBackTitleVisible: false,
+};
 
 function AuthNavigator() {
   return (
@@ -42,130 +48,58 @@ function AuthNavigator() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} options={{ title: 'Şifre Sıfırla' }} />
+      <Stack.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ ...defaultScreenOptions, title: 'Şifre Sıfırla', headerShown: true }}
+      />
     </Stack.Navigator>
   );
 }
 
 function UserNavigator() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: Colors.primary },
-        headerTintColor: Colors.white,
-        headerTitleStyle: { fontWeight: 'bold' },
-      }}
-    >
-      <Stack.Screen
-        name="UserHome"
-        component={UserHomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="CreateReport"
-        component={CreateReportScreen}
-        options={{ title: 'Bildirim Oluştur' }}
-      />
-      <Stack.Screen
-        name="NearbyVets"
-        component={NearbyVetsScreen}
-        options={{ title: 'Yakındaki Veterinerler' }}
-      />
-      <Stack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={{ title: 'Profilim' }}
-      />
-      <Stack.Screen
-        name="AllReports"
-        component={AllReportsScreen}
-        options={{ title: 'Tüm İlanlar' }}
-      />
-      <Stack.Screen
-        name="MyReports"
-        component={MyReportsScreen}
-        options={{ title: 'Bildirimlerim' }}
-      />
-      <Stack.Screen
-        name="ReportDetail"
-        component={ReportDetailScreen}
-        options={{ title: 'İlan Detayı' }}
-      />
-      <Stack.Screen
-        name="EditReport"
-        component={CreateReportScreen}
-        options={{ title: 'İlanı Düzenle' }}
-      />
-      <Stack.Screen
-        name="ChangePassword"
-        component={ChangePasswordScreen}
-        options={{ title: 'Şifre Değiştir' }}
-      />
-      <Stack.Screen
-        name="Inbox" 
-        component={InboxScreen} 
-        options={{ title: 'Mesajlarım' }}
-      />
+    <Stack.Navigator screenOptions={defaultScreenOptions}>
+      <Stack.Screen name="UserHome" component={UserHomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CreateReport" component={CreateReportScreen} options={{ title: 'Bildirim Oluştur' }} />
+      <Stack.Screen name="EditReport" component={CreateReportScreen} options={{ title: 'İlanı Düzenle' }} />
+      <Stack.Screen name="NearbyVets" component={NearbyVetsScreen} options={{ title: 'Yakındaki Veterinerler' }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Profilim' }} />
+      <Stack.Screen name="AllReports" component={AllReportsScreen} options={{ title: 'Tüm İlanlar' }} />
+      <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ title: 'Bildirimlerim' }} />
+      <Stack.Screen name="ReportDetail" component={ReportDetailScreen} options={{ title: 'İlan Detayı' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Şifre Değiştir' }} />
+      <Stack.Screen name="Inbox" component={InboxScreen} options={{ title: 'Mesajlarım' }} />
       <Stack.Screen
         name="Conversation"
         component={ConversationScreen}
-        options={{
-          title: '',
+        options={({ route }) => ({
+          title: route.params?.otherUserName || '',
           headerStyle: { backgroundColor: '#4CAF50' },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: 'bold' },
-      }}
+          headerBackTitleVisible: false,
+        })}
       />
-       <Stack.Screen
-        name="FoundAnimals"
-        component={FoundAnimalsScreen}
-        options={{ title: 'Bulunan Hayvanlar' }}
-       />
+      <Stack.Screen name="FoundAnimals" component={FoundAnimalsScreen} options={{ title: 'Bulunan Hayvanlar' }} />
     </Stack.Navigator>
   );
 }
 
 function VetNavigator() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: Colors.primary },
-        headerTintColor: Colors.white,
-        headerTitleStyle: { fontWeight: 'bold' },
-      }}
-    >
-      <Stack.Screen
-        name="VetHome"
-        component={VetHomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="VetReportDetail"
-        component={VetReportDetailScreen}
-        options={{ title: 'Bildirim Detayı' }}
-      />
-      <Stack.Screen
-        name="VetProfile"
-        component={VetProfileScreen}
-        options={{ title: 'Klinik Profilim' }}
-      />
-      <Stack.Screen
-        name="ChangePassword"
-        component={ChangePasswordScreen}
-        options={{ title: 'Şifre Değiştir' }}
-      />
+    <Stack.Navigator screenOptions={defaultScreenOptions}>
+      <Stack.Screen name="VetHome" component={VetHomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="VetReportDetail" component={VetReportDetailScreen} options={{ title: 'Bildirim Detayı' }} />
+      <Stack.Screen name="VetProfile" component={VetProfileScreen} options={{ title: 'Klinik Profilim' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Şifre Değiştir' }} />
     </Stack.Navigator>
   );
 }
 
 function AppNavigator() {
   const { token, user, loading } = useAuth();
-
-  // loading true iken splash screen göster
-  if (loading) {
-    return <SplashScreen />;
-  }
-
+  if (loading) return <SplashScreen />;
   if (!token) return <AuthNavigator />;
   if (user?.role === 'vet') return <VetNavigator />;
   return <UserNavigator />;
