@@ -29,11 +29,13 @@ def create_app():
     from routes.user import user_bp
     from routes.reports import reports_bp
     from routes.messages import messages_bp
+    from routes.ai import ai_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(user_bp, url_prefix="/api/user")
     app.register_blueprint(reports_bp, url_prefix="/api/reports")
     app.register_blueprint(messages_bp, url_prefix="/api/messages")
+    app.register_blueprint(ai_bp, url_prefix="/api/ai")
 
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):

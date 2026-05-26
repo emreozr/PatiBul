@@ -24,6 +24,7 @@ import ChangePasswordScreen from './src/screens/user/ChangePasswordScreen';
 import InboxScreen from './src/screens/user/InboxScreen';
 import ConversationScreen from './src/screens/user/ConversationScreen';
 import FoundAnimalsScreen from './src/screens/user/FoundAnimalsScreen';
+import EmergencyHelpScreen from './src/screens/user/EmergencyHelpScreen';
 
 // Vet Screens
 import VetHomeScreen from './src/screens/vet/VetHomeScreen';
@@ -82,6 +83,7 @@ function UserNavigator() {
         })}
       />
       <Stack.Screen name="FoundAnimals" component={FoundAnimalsScreen} options={{ title: 'Bulunan Hayvanlar' }} />
+      <Stack.Screen name="EmergencyHelp" component={EmergencyHelpScreen} options={{ title: '🐾 Pati - Acil Yardım' }} />
     </Stack.Navigator>
   );
 }

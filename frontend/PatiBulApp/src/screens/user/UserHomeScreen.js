@@ -58,7 +58,6 @@ const UserHomeScreen = ({ navigation }) => {
     } catch (e) {}
   }, [token]);
 
-  // Ekrana her dönüşte her ikisini de güncelle
   useFocusEffect(
     useCallback(() => {
       fetchUnreadCount();
@@ -75,7 +74,6 @@ const UserHomeScreen = ({ navigation }) => {
   }, [fetchUnreadCount, fetchNewReportsCount]);
 
   const handleAllReportsPress = async () => {
-    // Önce backend'e gördü bildir
     try {
       await fetch(`${API_URL}/api/reports/mark-seen`, {
         method: 'POST',
@@ -136,6 +134,21 @@ const UserHomeScreen = ({ navigation }) => {
             <Text style={styles.bannerSubtitle}>Kayıp ilanlarını görün, bildirim oluşturun.</Text>
           </View>
         </View>
+
+        {/* Acil Yardım Kartı */}
+        <TouchableOpacity
+          style={[styles.card, { borderLeftColor: '#FF3B30' }]}
+          onPress={() => navigation.navigate('EmergencyHelp')}
+        >
+          <Text style={styles.cardIcon}>🆘</Text>
+          <View style={styles.cardText}>
+            <Text style={styles.cardTitle}>Acil Yardım Al</Text>
+            <Text style={styles.cardSubtitle}>Yaralı hayvan, ilk yardım, yavru bakımı...</Text>
+          </View>
+          <View style={styles.emergencyBtn}>
+            <Text style={styles.emergencyBtnText}>Yardım Al</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* İlanlar */}
         <Text style={styles.sectionTitle}>İlanlar</Text>
@@ -287,7 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -368,6 +381,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#ccc',
     fontWeight: 'bold',
+  },
+  emergencyBtn: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  emergencyBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 
