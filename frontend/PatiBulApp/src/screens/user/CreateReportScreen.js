@@ -33,11 +33,12 @@ const CreateReportScreen = ({ route, navigation }) => {
 
   const isEdit = !!report;
 
-  // Düzenleme modunda mevcut verilerle doldur
   const [animalType, setAnimalType] = useState(report?.animal_type || '');
   const [description, setDescription] = useState(report?.description || '');
   const [locationDesc, setLocationDesc] = useState(report?.location_desc || '');
   const [image, setImage] = useState(null);
+  const [photoVerified, setPhotoVerified] = useState(false); // fotoğraf doğrulandı mı
+  const [verifying, setVerifying] = useState(false); // doğrulama yükleniyor
   const [location, setLocation] = useState(
     report?.latitude ? { latitude: report.latitude, longitude: report.longitude } : null
   );
@@ -47,6 +48,59 @@ const CreateReportScreen = ({ route, navigation }) => {
 
   const currentType = fromReport ? 'bulunan' : (report?.report_type || type);
   const config_type = typeConfig[currentType] || typeConfig.kayip;
+
+  // Fotoğraf seçilince doğrulama yap
+  const verifyPhoto = async (selectedImage) => {
+    if (!animalType) {
+      Alert.alert('Uyarı', 'Lütfen önce hayvan türünü seçin.');
+      return;
+    }
+    if (!description.trim()) {
+      Alert.alert('Uyarı', 'Lütfen önce açıklama alanını doldurun. Fotoğraf açıklamayla karşılaştırılacak.');
+      return;
+    }
+
+    setVerifying(true);
+    setPhotoVerified(false);
+
+    try {
+      const formData = new FormData();
+      const ext = selectedImage.uri.split('.').pop();
+      formData.append('image', {
+        uri: selectedImage.uri,
+        name: `verify.${ext}`,
+        type: `image/${ext}`,
+      });
+      formData.append('animal_type', animalType);
+      formData.append('description', description);
+
+      const response = await fetch(`${API_URL}/api/reports/verify-photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        Alert.alert('❌ Fotoğraf Reddedildi', data.error || 'Geçersiz fotoğraf.');
+        setImage(null);
+        setPhotoVerified(false);
+        return;
+      }
+
+      setImage(selectedImage);
+      setPhotoVerified(true);
+      Alert.alert('✅ Fotoğraf Onaylandı', 'Fotoğrafınız doğrulandı.');
+
+    } catch (e) {
+      // API hatası varsa fotoğrafı kabul et
+      setImage(selectedImage);
+      setPhotoVerified(true);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -60,7 +114,7 @@ const CreateReportScreen = ({ route, navigation }) => {
       aspect: [4, 3],
       quality: 0.7,
     });
-    if (!result.canceled) setImage(result.assets[0]);
+    if (!result.canceled) await verifyPhoto(result.assets[0]);
   };
 
   const takePhoto = async () => {
@@ -74,7 +128,7 @@ const CreateReportScreen = ({ route, navigation }) => {
       aspect: [4, 3],
       quality: 0.7,
     });
-    if (!result.canceled) setImage(result.assets[0]);
+    if (!result.canceled) await verifyPhoto(result.assets[0]);
   };
 
   const getCurrentLocation = async () => {
@@ -154,7 +208,7 @@ const CreateReportScreen = ({ route, navigation }) => {
         return;
       }
 
-      if (image) {
+      if (image && photoVerified) {
         const messageId = data.data.id;
         const formData = new FormData();
         const ext = image.uri.split('.').pop();
@@ -208,6 +262,13 @@ const CreateReportScreen = ({ route, navigation }) => {
       Alert.alert('Hata', 'Lütfen hayvan türü ve açıklama alanlarını doldurun.');
       return;
     }
+
+    // Fotoğraf seçildiyse ama doğrulanmadıysa engelle
+    if (image && !photoVerified) {
+      Alert.alert('Hata', 'Fotoğraf doğrulanmadı. Lütfen geçerli bir fotoğraf seçin.');
+      return;
+    }
+
     setLoading(true);
     try {
       const endpoint = isEdit ? `/api/reports/${report.id}` : '/api/reports/';
@@ -234,7 +295,7 @@ const CreateReportScreen = ({ route, navigation }) => {
 
       const reportId = isEdit ? report.id : data.report.id;
 
-      if (image && !isEdit) {
+      if (image && photoVerified && !isEdit) {
         const formData = new FormData();
         const ext = image.uri.split('.').pop();
         formData.append('image', {
@@ -292,9 +353,7 @@ const CreateReportScreen = ({ route, navigation }) => {
       {/* Düzenleme bandı */}
       {isEdit && (
         <View style={styles.editBanner}>
-          <Text style={styles.editBannerText}>
-            ✏️ İlanı düzenliyorsunuz
-          </Text>
+          <Text style={styles.editBannerText}>✏️ İlanı düzenliyorsunuz</Text>
         </View>
       )}
 
@@ -316,7 +375,14 @@ const CreateReportScreen = ({ route, navigation }) => {
           <TouchableOpacity
             key={a}
             style={[styles.animalTypeBtn, animalType === a && styles.animalTypeBtnActive]}
-            onPress={() => setAnimalType(a)}
+            onPress={() => {
+              setAnimalType(a);
+              // Hayvan türü değişince fotoğraf doğrulamasını sıfırla
+              if (image) {
+                setImage(null);
+                setPhotoVerified(false);
+              }
+            }}
           >
             <Text style={[
               styles.animalTypeBtnText,
@@ -387,21 +453,35 @@ const CreateReportScreen = ({ route, navigation }) => {
 
       {/* Fotoğraf */}
       <Text style={styles.sectionLabel}>Fotoğraf</Text>
-      <View style={styles.photoRow}>
-        <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
-          <Text style={styles.photoBtnIcon}>🖼️</Text>
-          <Text style={styles.photoBtnText}>Galeriden Seç</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
-          <Text style={styles.photoBtnIcon}>📷</Text>
-          <Text style={styles.photoBtnText}>Fotoğraf Çek</Text>
-        </TouchableOpacity>
-      </View>
 
-      {image && (
+      {verifying ? (
+        <View style={styles.verifyingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.verifyingText}>Fotoğraf doğrulanıyor...</Text>
+        </View>
+      ) : (
+        <View style={styles.photoRow}>
+          <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
+            <Text style={styles.photoBtnIcon}>🖼️</Text>
+            <Text style={styles.photoBtnText}>Galeriden Seç</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.photoBtn} onPress={takePhoto}>
+            <Text style={styles.photoBtnIcon}>📷</Text>
+            <Text style={styles.photoBtnText}>Fotoğraf Çek</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {image && photoVerified && (
         <View style={styles.imagePreviewContainer}>
+          <View style={styles.verifiedBadge}>
+            <Text style={styles.verifiedBadgeText}>✅ Doğrulandı</Text>
+          </View>
           <Image source={{ uri: image.uri }} style={styles.imagePreview} />
-          <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage(null)}>
+          <TouchableOpacity
+            style={styles.removeImageBtn}
+            onPress={() => { setImage(null); setPhotoVerified(false); }}
+          >
             <Text style={styles.removeImageText}>✕ Kaldır</Text>
           </TouchableOpacity>
         </View>
@@ -597,8 +677,34 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
+  verifyingContainer: {
+    alignItems: 'center',
+    padding: 20,
+    marginBottom: 16,
+  },
+  verifyingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
   imagePreviewContainer: {
     marginBottom: 20,
+  },
+  verifiedBadge: {
+    backgroundColor: '#4CAF5022',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  verifiedBadgeText: {
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '700',
   },
   imagePreview: {
     width: '100%',

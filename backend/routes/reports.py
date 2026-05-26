@@ -1,11 +1,15 @@
 import os
 import uuid
+import base64
+import requests
+from datetime import datetime, timedelta
 from math import radians, sin, cos, sqrt, atan2
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
-from models import db, PetReport, VetResponse, ReportImage
+from models import db, PetReport, VetResponse, ReportImage, User
+from config import Config
 
 reports_bp = Blueprint("reports", __name__)
 
@@ -24,6 +28,115 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
+
+
+def verify_animal_in_photo(image_path, expected_animal_type, description=""):
+    """
+    OpenAI GPT-4o ile fotoğrafta hayvan olup olmadığını ve
+    açıklamayla uyuşup uyuşmadığını kontrol eder.
+    Döner: (is_valid: bool, message: str)
+    """
+    try:
+        with open(image_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+
+        ext = image_path.rsplit(".", 1)[-1].lower()
+        mime_type = "image/png" if ext == "png" else "image/jpeg"
+
+        description_part = f"\nİlan açıklaması: {description}" if description else ""
+
+        prompt = f"""Bu fotoğrafı analiz et.
+
+İlanda belirtilen hayvan türü: {expected_animal_type}{description_part}
+
+Lütfen sadece şu formatta yanıt ver:
+HAYVAN_VAR: evet/hayır
+HAYVAN_TURU: (fotoğraftaki hayvan türü, yoksa "yok")
+ESLESIYOR: evet/hayır/belirsiz
+ACIKLAMA: (kısa bir açıklama, max 1 cümle)
+
+Kontrol kuralları:
+1. HAYVAN TÜRÜ (kesin kontrol):
+   - Fotoğraftaki hayvan türü ilan türüyle tam eşleşmeli
+   - Kedi ilanına köpek, köpek ilanına kedi kesinlikle reddedilir
+   - Tür eşleşmiyorsa ESLESIYOR: hayır yaz
+
+2. AÇIKLAMA DETAYLARI (yalnızca apaçık çelişkide reddet):
+   - Sadece renk tamamen zıt ve kesin farklıysa reddet
+     Örnek: "siyah kedi" yazıyor ama fotoğrafta turuncu/sarı kedi → reddet
+     Örnek: "beyaz köpek" yazıyor ama fotoğrafta kahverengi köpek → reddet
+     Örnek: "turuncu kedi" yazıyor ama fotoğrafta siyah kedi → reddet
+   - Renk biraz farklıysa veya belirsizse reddetme (ışık, filtre etkisi olabilir)
+     Örnek: "sarı kedi" yazıyor, fotoğrafta krem/bej kedi → kabul et
+   - Tasma, aksesuar, ırk gibi detaylar görünmüyorsa kesinlikle reddetme
+   - Şüphe durumunda daima ESLESIYOR: belirsiz yaz → kabul edilir
+
+3. GENEL:
+   - Fotoğrafta hiç hayvan yoksa HAYVAN_VAR: hayır yaz
+   - İnsan, manzara, yemek, nesne fotoğrafları kesinlikle reddedilmeli"""
+
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4o",
+                "max_tokens": 200,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{image_data}",
+                                    "detail": "low",
+                                },
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+            },
+            timeout=15,
+        )
+
+        if response.status_code != 200:
+            print(f"OpenAI API hatası: {response.status_code} - {response.text}")
+            return True, "Doğrulama yapılamadı, fotoğraf kabul edildi"
+
+        content = response.json()["choices"][0]["message"]["content"]
+        print(f"OpenAI yanıtı: {content}")
+
+        lines = content.strip().split("\n")
+        result = {}
+        for line in lines:
+            if ":" in line:
+                key, val = line.split(":", 1)
+                result[key.strip()] = val.strip().lower()
+
+        hayvan_var = result.get("HAYVAN_VAR", "hayır")
+        eslesiyor = result.get("ESLESIYOR", "hayır")
+
+        if hayvan_var == "hayır":
+            return False, "Fotoğrafta hayvan tespit edilemedi. Lütfen hayvanın göründüğü bir fotoğraf yükleyin."
+
+        if eslesiyor == "hayır":
+            hayvan_turu = result.get("HAYVAN_TURU", "").strip()
+            if hayvan_turu and hayvan_turu == expected_animal_type.lower():
+                return False, "Fotoğraftaki hayvanın özellikleri (renk, görünüm) açıklamanızla uyuşmuyor. Lütfen açıklamanıza uygun bir fotoğraf yükleyin."
+            return False, f"Fotoğraftaki hayvan türü ilan türüyle uyuşmuyor. Lütfen '{expected_animal_type}' fotoğrafı yükleyin."
+
+        return True, "Fotoğraf doğrulandı"
+
+    except requests.Timeout:
+        print("OpenAI API timeout")
+        return True, "Doğrulama zaman aşımına uğradı, fotoğraf kabul edildi"
+    except Exception as e:
+        print(f"Fotoğraf doğrulama hatası: {str(e)}")
+        return True, "Doğrulama yapılamadı, fotoğraf kabul edildi"
 
 
 # ─── Bildirim oluştur ──────────────────────────────────────────────────────
@@ -116,7 +229,78 @@ def get_closed_reports():
     return jsonify({"reports": [r.to_dict() for r in reports]}), 200
 
 
-# ─── Fotoğraf yükle ────────────────────────────────────────────────────────
+# ─── Yeni ilan sayısı ─────────────────────────────────────────────────────
+# ÖNEMLI: Bu route /<int:report_id> rotalarından ÖNCE olmalı
+@reports_bp.route("/new-count", methods=["GET"])
+@jwt_required()
+def get_new_reports_count():
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"new_count": 0}), 200
+    if user.last_seen_reports:
+        cutoff = user.last_seen_reports
+    else:
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+    count = PetReport.query.filter(PetReport.created_at > cutoff).count()
+    return jsonify({"new_count": count}), 200
+
+
+# ─── İlanları görüldü olarak işaretle ────────────────────────────────────
+# ÖNEMLI: Bu route /<int:report_id> rotalarından ÖNCE olmalı
+@reports_bp.route("/mark-seen", methods=["POST"])
+@jwt_required()
+def mark_reports_seen():
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+    user.last_seen_reports = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"message": "Görüldü"}), 200
+
+
+# ─── Fotoğraf doğrula (ilan oluşturmadan önce) ────────────────────────────
+# ÖNEMLI: Bu route /<int:report_id> rotalarından ÖNCE olmalı
+@reports_bp.route("/verify-photo", methods=["POST"])
+@jwt_required()
+def verify_photo():
+    animal_type = request.form.get("animal_type", "")
+    if not animal_type:
+        return jsonify({"error": "Hayvan türü zorunludur"}), 400
+    if "image" not in request.files:
+        return jsonify({"error": "Fotoğraf seçilmedi"}), 400
+    file = request.files["image"]
+    if not allowed_file(file.filename):
+        return jsonify({"error": "Geçersiz dosya türü"}), 400
+
+    # Geçici dosyaya kaydet
+    upload_folder = os.path.join(current_app.root_path, "uploads", "temp")
+    os.makedirs(upload_folder, exist_ok=True)
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    filename = f"temp_{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(upload_folder, filename)
+    file.save(filepath)
+
+    # Açıklamayı da al
+    description = request.form.get("description", "")
+
+    # Doğrula
+    is_valid, message = verify_animal_in_photo(filepath, animal_type, description)
+
+    # Geçici dosyayı sil
+    try:
+        os.remove(filepath)
+    except:
+        pass
+
+    if not is_valid:
+        return jsonify({"error": message}), 400
+
+    return jsonify({"message": message, "valid": True}), 200
+
+
+# ─── Fotoğraf yükle (OpenAI doğrulama ile) ────────────────────────────────
 @reports_bp.route("/<int:report_id>/upload-image", methods=["POST"])
 @jwt_required()
 def upload_image(report_id):
@@ -131,16 +315,32 @@ def upload_image(report_id):
         return jsonify({"error": "Dosya adı boş"}), 400
     if not allowed_file(file.filename):
         return jsonify({"error": "Geçersiz dosya türü"}), 400
+
+    # Önce geçici olarak kaydet
     upload_folder = os.path.join(current_app.root_path, "uploads")
     os.makedirs(upload_folder, exist_ok=True)
     ext = file.filename.rsplit(".", 1)[1].lower()
     filename = f"{uuid.uuid4().hex}.{ext}"
     filepath = os.path.join(upload_folder, filename)
     file.save(filepath)
+
+    # OpenAI ile fotoğraf doğrula
+    is_valid, message = verify_animal_in_photo(filepath, report.animal_type)
+
+    if not is_valid:
+        # Geçersiz fotoğrafı sil
+        os.remove(filepath)
+        return jsonify({"error": message}), 400
+
+    # Geçerliyse veritabanına kaydet
     image = ReportImage(report_id=report_id, image_url=f"/uploads/{filename}")
     db.session.add(image)
     db.session.commit()
-    return jsonify({"message": "Fotoğraf yüklendi", "image": image.to_dict()}), 201
+    return jsonify({
+        "message": "Fotoğraf yüklendi",
+        "image": image.to_dict(),
+        "verification": message,
+    }), 201
 
 
 # ─── Bildirim detayı ───────────────────────────────────────────────────────

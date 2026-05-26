@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Mail } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import Colors from '../../styles/colors';
@@ -35,6 +36,7 @@ const QuickActionCard = ({ icon, title, subtitle, color, onPress, badge }) => (
 const UserHomeScreen = ({ navigation }) => {
   const { user, token } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [newReportsCount, setNewReportsCount] = useState(0);
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -46,17 +48,49 @@ const UserHomeScreen = ({ navigation }) => {
     } catch (e) {}
   }, [token]);
 
+  const fetchNewReportsCount = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/reports/new-count`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) setNewReportsCount(data.new_count || 0);
+    } catch (e) {}
+  }, [token]);
+
+  // Ekrana her dönüşte her ikisini de güncelle
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+      fetchNewReportsCount();
+    }, [fetchUnreadCount, fetchNewReportsCount])
+  );
+
   useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 15000);
+    const interval = setInterval(() => {
+      fetchUnreadCount();
+      fetchNewReportsCount();
+    }, 15000);
     return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, fetchNewReportsCount]);
+
+  const handleAllReportsPress = async () => {
+    // Önce backend'e gördü bildir
+    try {
+      await fetch(`${API_URL}/api/reports/mark-seen`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (e) {}
+    setNewReportsCount(0);
+    navigation.navigate('AllReports');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar backgroundColor={Colors.primary} barStyle="light-content" />
 
-      {/* Header - yeşil */}
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerGreeting}>Merhaba 👋</Text>
@@ -110,7 +144,8 @@ const UserHomeScreen = ({ navigation }) => {
           title="Tüm İlanlar"
           subtitle="Kayıp, bulunan ve yaralı hayvan ilanları"
           color={Colors.primary}
-          onPress={() => navigation.navigate('AllReports')}
+          badge={newReportsCount}
+          onPress={handleAllReportsPress}
         />
         <QuickActionCard
           icon="📌"
@@ -165,8 +200,6 @@ const UserHomeScreen = ({ navigation }) => {
           color="#FF9500"
           onPress={() => navigation.navigate('NearbyVets')}
         />
-
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -335,20 +368,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#ccc',
     fontWeight: 'bold',
-  },
-  logoutButton: {
-    marginTop: 24,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FF6B6B',
-  },
-  logoutText: {
-    color: '#FF6B6B',
-    fontWeight: '600',
-    fontSize: 15,
   },
 });
 

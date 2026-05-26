@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, send_from_directory
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
@@ -19,7 +22,7 @@ def create_app():
     db.init_app(app)
     jwt.init_app(app)
     bcrypt.init_app(app)
-    mail.init_app(app) # Mail burada app'e bağlanıyor
+    mail.init_app(app)
 
     # Blueprint'leri kayıt et
     from routes.auth import auth_bp
@@ -36,7 +39,7 @@ def create_app():
     def uploaded_file(filename):
         upload_folder = os.path.join(app.root_path, "uploads")
         return send_from_directory(upload_folder, filename)
-    
+
     @app.after_request
     def log_response(response):
         print(f"STATUS: {response.status}")
@@ -49,5 +52,4 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    # Debug modu açık kalsın ki hatayı terminalde görelim
     app.run(debug=True, host="0.0.0.0", port=5000)
