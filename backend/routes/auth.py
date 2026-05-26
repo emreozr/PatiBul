@@ -22,16 +22,57 @@ def register():
     role = data.get("role", "user")
     if role not in ["user", "vet"]:
         return jsonify({"error": "Geçersiz rol"}), 400
+
     hashed_pw = bcrypt.generate_password_hash(data["password"]).decode("utf-8")
+
+    # Veterinerler onay bekleyecek, kullanıcılar direkt aktif
+    is_approved = role != "vet"
+
     user = User(
         name=data["name"],
         email=data["email"],
         password=hashed_pw,
         role=role,
         phone=data.get("phone"),
+        is_approved=is_approved,
     )
     db.session.add(user)
     db.session.commit()
+
+    # Veteriner kaydolduysa admin'e bildirim maili gönder
+    if role == "vet":
+        try:
+            admin_users = User.query.filter_by(role="admin").all()
+            for admin in admin_users:
+                msg = Message(
+                    subject="PatiBul - Yeni Veteriner Kayıt Talebi",
+                    sender=Config.MAIL_DEFAULT_SENDER,
+                    recipients=[admin.email]
+                )
+                msg.html = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 30px; background: #f9f9f9; border-radius: 12px;">
+                    <h1 style="color: #3DAA6E;">🐾 PatiBul</h1>
+                    <h2>Yeni Veteriner Kayıt Talebi</h2>
+                    <p>Aşağıdaki veteriner hesap onayı bekliyor:</p>
+                    <table style="width:100%; border-collapse: collapse;">
+                        <tr><td style="padding:8px; font-weight:bold;">Ad Soyad:</td><td style="padding:8px;">{user.name}</td></tr>
+                        <tr><td style="padding:8px; font-weight:bold;">E-posta:</td><td style="padding:8px;">{user.email}</td></tr>
+                        <tr><td style="padding:8px; font-weight:bold;">Telefon:</td><td style="padding:8px;">{user.phone or '-'}</td></tr>
+                        <tr><td style="padding:8px; font-weight:bold;">Kayıt Tarihi:</td><td style="padding:8px;">{user.created_at.strftime('%d.%m.%Y %H:%M')}</td></tr>
+                    </table>
+                    <p style="color:#888; font-size:13px;">Lütfen PatiBul admin panelinden bu hesabı onaylayın veya reddedin.</p>
+                </div>
+                """
+                mail.send(msg)
+        except Exception as e:
+            print(f"Admin mail hatası: {str(e)}")
+
+        return jsonify({
+            "message": "Kayıt talebiniz alındı. Hesabınız admin onayından sonra aktif olacaktır.",
+            "user": user.to_dict(),
+            "pending": True,
+        }), 201
+
     return jsonify({"message": "Kayıt başarılı", "user": user.to_dict()}), 201
 
 
@@ -43,6 +84,11 @@ def login():
     user = User.query.filter_by(email=data["email"]).first()
     if not user or not bcrypt.check_password_hash(user.password, data["password"]):
         return jsonify({"error": "E-posta veya şifre hatalı"}), 401
+
+    # Veteriner onay kontrolü
+    if user.role == "vet" and not user.is_approved:
+        return jsonify({"error": "Hesabınız henüz onaylanmadı. Admin onayını bekleyiniz."}), 403
+
     token = create_access_token(
         identity=str(user.id),
         additional_claims={"role": user.role}
@@ -63,14 +109,11 @@ def forgot_password():
 
         user = User.query.filter_by(email=data["email"]).first()
 
-        # Kullanıcı bulunamasa bile aynı yanıtı dön (güvenlik)
         if not user:
             return jsonify({"message": "Kod gönderildi"}), 200
 
-        # 6 haneli kod üret
         code = str(random.randint(100000, 999999))
 
-        # Eski tokenları geçersiz kıl
         PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({"used": True})
         db.session.commit()
 
@@ -83,7 +126,6 @@ def forgot_password():
         db.session.add(reset_token)
         db.session.commit()
 
-        # Mail gönder
         msg = Message(
             subject="PatiBul - Şifre Sıfırlama Kodu",
             sender=Config.MAIL_DEFAULT_SENDER,

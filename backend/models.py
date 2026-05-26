@@ -15,7 +15,11 @@ class User(db.Model):
     phone = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     profile_photo = db.Column(db.String(255), nullable=True)
-    last_seen_reports = db.Column(db.DateTime, nullable=True)  # Son ilan görüntüleme zamanı
+    last_seen_reports = db.Column(db.DateTime, nullable=True)
+
+    # Veteriner onay sistemi
+    # user ve admin için True, vet için kayıtta False — admin onaylayınca True
+    is_approved = db.Column(db.Boolean, default=True, nullable=False)
 
     clinic_name = db.Column(db.String(150), nullable=True)
     clinic_address = db.Column(db.String(255), nullable=True)
@@ -39,6 +43,7 @@ class User(db.Model):
             "longitude": self.longitude,
             "created_at": self.created_at.isoformat(),
             "profile_photo": self.profile_photo,
+            "is_approved": self.is_approved,
         }
 
 

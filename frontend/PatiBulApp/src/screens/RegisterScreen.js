@@ -21,13 +21,24 @@ const RegisterScreen = ({ navigation }) => {
     }
     setLoading(true);
     try {
-      await apiFetch('/api/auth/register', {
+      const { data } = await apiFetch('/api/auth/register', {
         method: 'POST',
         body: { name: username, email, password, role },
       });
-      Alert.alert('Başarılı', 'Kayıt işlemi başarılı!', [
-        { text: 'Tamam', onPress: () => navigation.navigate('Login') }
-      ]);
+
+      if (role === 'vet') {
+        // Veteriner kaydı — onay bekliyor
+        Alert.alert(
+          '📋 Talebiniz Alındı',
+          'Veteriner hesabınız oluşturuldu. Admin onayından sonra e-posta adresinize bilgilendirme yapılacak ve giriş yapabileceksiniz.',
+          [{ text: 'Tamam', onPress: () => navigation.navigate('Login') }]
+        );
+      } else {
+        // Normal kullanıcı kaydı
+        Alert.alert('Başarılı', 'Kayıt işlemi başarılı!', [
+          { text: 'Tamam', onPress: () => navigation.navigate('Login') }
+        ]);
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.type === ERROR_TYPES.CLIENT) {
@@ -81,10 +92,19 @@ const RegisterScreen = ({ navigation }) => {
               Veteriner
             </Text>
             <Text style={[styles.roleButtonSub, role === 'vet' && styles.roleButtonSubActive]}>
-              Bildirimleri yönet
+              Admin onayı gerekli
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Veteriner uyarısı */}
+        {role === 'vet' && (
+          <View style={styles.vetWarning}>
+            <Text style={styles.vetWarningText}>
+              ⚠️ Veteriner hesabı admin onayına tabidir. Onay sonrası e-posta ile bilgilendirileceksiniz.
+            </Text>
+          </View>
+        )}
 
         {/* Ad Soyad */}
         <Text style={styles.label}>Ad Soyad</Text>
@@ -184,7 +204,7 @@ const styles = StyleSheet.create({
   roleContainer: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   roleButton: {
     flex: 1,
@@ -220,6 +240,20 @@ const styles = StyleSheet.create({
   },
   roleButtonSubActive: {
     color: 'rgba(255,255,255,0.85)',
+  },
+  vetWarning: {
+    backgroundColor: 'rgba(255,200,0,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,200,0,0.4)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  vetWarningText: {
+    color: 'rgba(255,230,100,0.9)',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   primaryBtn: {
     backgroundColor: '#1a1a2e',

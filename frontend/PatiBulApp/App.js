@@ -25,6 +25,7 @@ import InboxScreen from './src/screens/user/InboxScreen';
 import ConversationScreen from './src/screens/user/ConversationScreen';
 import FoundAnimalsScreen from './src/screens/user/FoundAnimalsScreen';
 import EmergencyHelpScreen from './src/screens/user/EmergencyHelpScreen';
+import AdminHomeScreen from './src/screens/admin/AdminHomeScreen';
 
 // Vet Screens
 import VetHomeScreen from './src/screens/vet/VetHomeScreen';
@@ -99,10 +100,19 @@ function VetNavigator() {
   );
 }
 
+function AdminNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AdminHome" component={AdminHomeScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function AppNavigator() {
   const { token, user, loading } = useAuth();
   if (loading) return <SplashScreen />;
   if (!token) return <AuthNavigator />;
+  if (user?.role === 'admin') return <AdminNavigator />;
   if (user?.role === 'vet') return <VetNavigator />;
   return <UserNavigator />;
 }
