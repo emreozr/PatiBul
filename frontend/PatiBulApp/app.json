@@ -24,6 +24,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "006a4277-c970-4a7e-8d0b-8691e075152b"
+      }
+    },
+    "owner": "mervecura"
   }
 }

@@ -9,6 +9,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 from models import db, PetReport, VetResponse, ReportImage, User
+from routes.notifications import notify_nearby_users
 from config import Config
 
 reports_bp = Blueprint("reports", __name__)
@@ -165,6 +166,22 @@ def create_report():
     )
     db.session.add(report)
     db.session.commit()
+
+    # Yakındaki kullanıcılara bildirim gönder
+    if report.latitude and report.longitude:
+        type_labels = {"kayip": "Kayıp", "bulunan": "Bulunan", "yarali": "Yaralı"}
+        label = type_labels.get(report.report_type, "")
+        try:
+            notify_nearby_users(
+                report_lat=report.latitude,
+                report_lon=report.longitude,
+                title=f"🐾 Yakında {label} Hayvan İlanı",
+                body=f"{report.animal_type} • {report.location_desc or 'Konum belirtilmedi'}",
+                exclude_user_id=int(user_id),
+            )
+        except Exception as e:
+            print(f"Bildirim hatası: {str(e)}")
+
     return jsonify({"message": "Bildirim oluşturuldu", "report": report.to_dict()}), 201
 
 

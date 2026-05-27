@@ -18,8 +18,10 @@ class User(db.Model):
     last_seen_reports = db.Column(db.DateTime, nullable=True)
 
     # Veteriner onay sistemi
-    # user ve admin için True, vet için kayıtta False — admin onaylayınca True
     is_approved = db.Column(db.Boolean, default=True, nullable=False)
+
+    # Push notification token
+    push_token = db.Column(db.String(500), nullable=True)
 
     clinic_name = db.Column(db.String(150), nullable=True)
     clinic_address = db.Column(db.String(255), nullable=True)
